@@ -44,6 +44,8 @@ In <https://console.neon.tech>, open the project and click **Connect**:
 | `APP_PASSWORD` | The owner's password (user name `khaled elbauomy`) |
 | `VIEWER_PASSWORD` | The view-only user's password (user name `remoon milad`). If it is empty, that account cannot sign in |
 | `SESSION_SECRET` | Any random text of at least 32 characters |
+| `ADO_ORG` | *(optional, Azure DevOps sync)* your organization name, for example `act-eg` |
+| `ADO_PAT` | *(optional, Azure DevOps sync)* an access token with **Work Items (Read & write)**. Keep it secret |
 
 The user names are built in and can be changed with the optional `ADMIN_USERNAME` and `VIEWER_USERNAME` settings.
 

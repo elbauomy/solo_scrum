@@ -29,8 +29,35 @@ Open the member and add them to every squad they work in, with hours per week fo
 ## When the team has to stop (pause a sprint)
 Open the sprint → **Sprint status** → **Pause sprint**, choose the day it stopped and add the reason. While paused, its tasks are left out of the timeline and the sprint takes no share of anyone's hours. When work starts again, choose **Resume sprint**: tick *Move the end date out* to give the team back the working days they lost. The sprint page keeps a list of every pause. **Edit sprint** (button at the top of the sprint page, or *Edit* in the sprint list) changes the name, dates, goal and release.
 
-## Azure DevOps
-The Azure DevOps sync is switched off in this version until IT and ACT management approve it. It is kept on the `azure-devops-sync` branch and comes back with one merge.
+## Keeping Azure DevOps and Solo Scrum in step
+Each line of business can be linked to one Azure DevOps project. Press a button and changes flow both ways. It never runs by itself, so nothing changes until you press it.
+
+**One-time setup (owner)**
+1. In Azure DevOps click your profile picture → **Personal access tokens** → **New token**. Name it *Solo Scrum*, choose the organization, set the expiry to 90 days and under **Scopes** pick **Work Items → Read & write**. Copy the token once; it is never shown again.
+2. In Vercel open the project → **Settings → Environment Variables** and add `ADO_ORG` (the organization name from the Azure DevOps address, for example `act-eg`) and `ADO_PAT` (the token). Redeploy.
+3. Never paste the token in chat, email or the code. When it expires, make a new one and replace `ADO_PAT`. If it is ever shared by mistake, revoke it in Azure DevOps straight away.
+
+**Linking** Open **Azure DevOps** in the menu, choose the project for each line of business and click **Save link**. A line can be linked to one project, and the choice is fixed once items have come in.
+
+**Every sync**
+1. Click **Check changes**. It shows what would happen and changes nothing on either side.
+2. If it looks right, click **Sync now**. The report lists what was brought in, what was sent, conflicts and anything that needs your attention.
+3. Press it again if the report says some changes were postponed; a sync stops after about 35 seconds of sending to stay inside the free hosting limits, and picks up where it stopped.
+
+**Who decides what**
+| Azure DevOps decides | This system decides | Either side (the latest change wins) |
+|---|---|---|
+| Title, description, acceptance criteria, item type, where it sits in the hierarchy | Task hours (sent to Azure DevOps as *Remaining work*; zero once Done), order, blocked flag, priority after the first import | Status, the assignee of a task, the sprint of a story or bug (its open tasks follow) |
+
+**Good to know**
+- New items are created here only. Items are never created or deleted in Azure DevOps, and nothing is deleted here either.
+- The first time a project is synced, finished items older than 60 days are left out (tick *Also bring in old finished items* to include them). Items from the types we do not use (test cases, impediments…) are ignored.
+- Azure DevOps allows more nesting than this system. A bug under a user story is placed under that story's feature, and a feature with no epic, or a task with no story, is not brought in; the report names them.
+- People are matched to members by name. If someone is assigned in Azure DevOps but is not a member here, the report names them: add the member and the next sync fills it in.
+- Past sprints that do not exist here are not created: their stories wait in the backlog. Sprints that have not ended yet are created (or linked, when a sprint with the same name exists) automatically.
+- If a person edits an item in Azure DevOps at the very moment we send our change, nothing is overwritten; it is retried next sync.
+- When both sides changed the same field since the last sync, the most recent change wins and the conflict is listed in the report.
+- The view-only account can see the page and the last report but cannot run a sync.
 
 ## Cleaning up (delete one or many)
 - **Members**: each row has a **Delete** button, and you can tick several rows (or *Select all*) and click **Delete selected**. Their tasks stay and become unassigned; their squad hours, leave, sprint capacity and standup notes are removed.
