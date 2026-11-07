@@ -206,27 +206,9 @@ The team plans each sprint in a spreadsheet (see the Sonata sheet "Sonata - Rele
 
 **Standup.** `StandupEntry.off` / `offReason` mark a day off. Saving it clears the status, adds a one-day `Leave` whose note starts with `Off - daily standup` (so it can be found and removed when unticked; a leave added on the member's page is shown but left alone), and sets the same flag on the member's notes in other squads for that day. `StandupEntry.status` holds the status typed by hand (plus optional blockers). Entries saved in the earlier yesterday / today format are shown as one status and converted the first time they are edited. The date defaults to the date on the user's own clock.
 
-### Azure DevOps sync
+### Azure DevOps sync (switched off)
 
-A manual, two-way sync per line of business (`/azure`). No webhooks and no background jobs: the free hosting plan cannot run them reliably, so the owner presses **Check changes** (dry run) or **Sync now**.
-
-| Piece | File | Notes |
-|---|---|---|
-| REST client | `ado-client.ts` | Basic auth with the token from `ADO_ORG` / `ADO_PAT` (server only; `ADO_BASE_URL` exists for tests). WIQL for ids, `workitemsbatch` in chunks of 200, iterations tree, `PATCH` guarded by `test /rev` so a concurrent edit is refused (412) and retried next time. Failures are turned into plain-language messages. |
-| Rules | `ado-sync.ts` | Pure: `toAdoItem`, status mapping (Scrum process: PBI/Bug New→Approved→Committed→Done, Task To Do→In Progress→Done), `planSync` returning creates, local updates, Azure DevOps updates, notes and conflicts. Fully unit-tested. |
-| Push | `ado-push.ts` | Sends one item; if the whole change is refused each field is tried alone so a bad field does not block the rest. |
-| Runner | `ado-sync-run.ts` | Loads both sides, builds the plan, applies local changes in one transaction (bulk `createMany`), then pushes with 4 parallel requests and a ~35 s budget (the rest waits for the next sync). Saves the last report on the LOB. |
-| Actions / UI | `actions/azure.ts`, `azure/page.tsx`, `azure-sync.tsx` | Owner only (`requireAuth`); the viewer sees status but no buttons. |
-
-**Data**: `LineOfBusiness.adoProject` / `adoLastSyncAt` / `adoLastResult`; `WorkItem.adoId` (unique per LOB) and `adoSnapshot`; `Sprint.adoPath` (iteration path).
-
-**Three-way merge.** `adoSnapshot` records, per item, what both sides agreed on at the last sync (`status`, normalized `assignee`, `sprint` path, `hours` last sent, `rev`). For a field changed on one side only, that side wins; if both changed, the later of Azure DevOps `ChangedDate` and the local `updatedAt` wins and the conflict is reported. A pushed field is only remembered after Azure DevOps accepted it, so a failure is retried; this also means nothing can be echoed back and forth.
-
-**Ownership.** Azure DevOps owns title, description, acceptance criteria, type and parent. This system owns hours, rank, blocked and (after creation) priority. Epic and feature status is not synced (it is calculated here). Task hours come in once at creation (original estimate, else remaining work) and are afterwards only sent (`Remaining work`, 0 when Done).
-
-**Mapping.** One Azure DevOps project per LOB. Product Backlog Item/User Story → story. Parents are resolved to the nearest allowed ancestor (bug under a story → the story's feature). Sprints match by iteration path, else by name, and are created only when the iteration has dates and has not ended; items in unknown sprints stay in the backlog and their path is remembered so they are neither reported again nor pushed back. Items in closed sprints are never moved. Assignees match members by case/space-insensitive name; unknown people are listed in the report.
-
-**Safety.** Items are never created or deleted in Azure DevOps, nothing is ever deleted locally, removed or missing items are only reported, and the first import skips finished items older than 60 days.
+The two-way sync is not part of `main`. It lives on the `azure-devops-sync` branch, which is `main` plus one commit that brings it back, and it is merged only after the IT and management approvals (see the approvals document). The database columns it uses (`LineOfBusiness.adoProject` / `adoLastSyncAt` / `adoLastResult`, `WorkItem.adoId` / `adoSnapshot`, `Sprint.adoPath`) stay in the schema, unused, so switching it on or off never needs a database change.
 
 ### Look and feel (ACT brand)
 
@@ -287,7 +269,7 @@ Hours "burn" only when a task becomes **Done**.
 
 ## 7. Security
 
-- `APP_PASSWORD` (owner), `VIEWER_PASSWORD` (view-only user), `SESSION_SECRET` (signs the session cookie) and `ADO_PAT` (Azure DevOps token) live only in the
+- `APP_PASSWORD` (owner), `VIEWER_PASSWORD` (view-only user) and `SESSION_SECRET` (signs the session cookie) live only in the
   hosting provider's environment variables, never in the code. User names default to `khaled elbauomy` and `remoon milad` (`ADMIN_USERNAME`, `VIEWER_USERNAME`).
 - Two roles (`credentials.ts`): **admin** and **viewer**. The session cookie carries the role and name, signed with HS256, so it cannot be changed in the browser.
   Login compares the typed password with the account's password in constant time and gives the same message for an unknown user and a wrong password.

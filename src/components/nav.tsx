@@ -22,7 +22,6 @@ const ICONS = {
   reports: (<><path d="M4 20h16" /><rect x="5.5" y="11" width="3.5" height="7" rx="1" /><rect x="10.5" y="6" width="3.5" height="12" rx="1" /><rect x="15.5" y="9" width="3.5" height="9" rx="1" /></>),
   settings: (<><path d="M4 8h9M17 8h3M4 16h3M11 16h9" /><circle cx="15" cy="8" r="2" /><circle cx="9" cy="16" r="2" /></>),
   data: (<><path d="M12 4v10m0 0l-3.5-3.5M12 14l3.5-3.5" /><path d="M4.5 15.5v2A2.5 2.5 0 007 20h10a2.5 2.5 0 002.5-2.5v-2" /></>),
-  azure: (<><path d="M5 10a7 7 0 0112-3.2L19 9" /><path d="M19 4v5h-5" /><path d="M19 14a7 7 0 01-12 3.2L5 15" /><path d="M5 20v-5h5" /></>),
 } satisfies Record<string, ReactNode>;
 
 const sections: { title: string; items: NavItem[] }[] = [
@@ -52,7 +51,6 @@ const sections: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/settings", label: "Settings", icon: "settings" },
       { href: "/data", label: "Import & Backup", icon: "data" },
-      { href: "/azure", label: "Azure DevOps", icon: "azure" },
     ],
   },
 ];

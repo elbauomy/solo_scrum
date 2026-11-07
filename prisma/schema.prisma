@@ -52,6 +52,7 @@ model LineOfBusiness {
   key              String                @unique
   /// Next item number to hand out in this LOB
   nextItemNumber   Int                   @default(1)
+  /// Azure DevOps sync columns: kept but unused while the sync is switched off (it lives on the azure-devops-sync branch).
   /// Name of the Azure DevOps project this line syncs with (empty = not linked)
   adoProject       String?
   adoLastSyncAt    DateTime?
