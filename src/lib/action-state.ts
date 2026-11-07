@@ -4,7 +4,6 @@ import { z } from "zod";
 
 /** What every form action returns. */
 import type { SprintImportPreview } from "./sprint-sheet";
-import type { SyncSummary } from "./ado-sync";
 
 export type ActionState = {
   error?: string;
@@ -14,8 +13,6 @@ export type ActionState = {
   /** Sprint planning import: what was read from the sheet and what will happen */
   preview?: SprintImportPreview;
   link?: { href: string; label: string };
-  /** Azure DevOps sync: what was (or would be) done */
-  sync?: SyncSummary;
 };
 
 export const initialState: ActionState = {};

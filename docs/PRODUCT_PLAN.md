@@ -23,7 +23,7 @@ releases, the timeline and reports, following ACT's own process rather than stan
 | Daily standup | Choose squad and date (today by default), type each member's status by hand (optional blockers); history filterable by squad, date and member |
 | Filters | On home dashboard, backlog, sprint board, timeline, reports and standup |
 | Export | Excel + PDF for every report, Excel for lists, full backup |
-| Azure DevOps | Each LOB links to one Azure DevOps project. A button (check first, then sync) keeps both in step: Azure DevOps owns text and hierarchy, this system owns hours, order and blocked flags, and status, task assignee and story sprint go both ways (latest change wins). Items are never created or deleted in Azure DevOps. |
+| Azure DevOps | Two-way sync is built but switched off until IT and ACT management approve it. It is kept on the `azure-devops-sync` branch. |
 | Language | English only |
 | Hosting | 100% free: Vercel (Hobby) + Neon + GitHub. `*.netlify.app` is blocked on the owner's networks. |
 | Import | The team's sprint planning sheet (Sonata layout, .xlsx or .csv) creates/updates the sprint, member capacity, user stories and tasks. A simple work-item template import also exists. |
@@ -38,6 +38,6 @@ releases, the timeline and reports, following ACT's own process rather than stan
 6. **Reports & dashboard**: sprint health, velocity, burndown, capacity/load, productivity, commitment/scope/carry-over/bugs, cycle time, release forecast; filters; Excel + PDF export; full backup
 7. **Excel import** of work items using the app's template
 8. **Sprint planning import**: the sprint sheet becomes the sprint, member capacity, user stories and tasks; the timeline fills automatically from the estimates
-9. **Azure DevOps sync**: link a LOB to a project, check what would change, then sync both ways (button, not automatic)
+9. **Azure DevOps sync**: built, switched off on `main` until approved (branch `azure-devops-sync`)
 
 Metric formulas are in [TECHNICAL_PLAN.md](./TECHNICAL_PLAN.md#6-metric-definitions).
