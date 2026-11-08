@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "prisma migrate deploy && next build"
+  "buildCommand": "prisma migrate deploy && next build",
+  "git": {
+    "deploymentEnabled": {
+      "act-sqlserver": false,
+      "azure-devops-sync": false
+    }
+  }
 }
