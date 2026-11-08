@@ -1,12 +1,15 @@
 import { db } from "@/lib/db";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { getSettings } from "@/lib/settings";
 import { WEEKDAYS, formatDate, toISODate } from "@/lib/dates";
 import { addHoliday, deleteHoliday, updateSettings } from "@/lib/actions/settings";
 import { ActionForm, DeleteButton, SubmitButton } from "@/components/ui/forms";
 import { Card, Empty, Field, Input, PageHeader, Table, Td, Th } from "@/components/ui";
-import { EditOnly } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
+  const me = await requirePageAccess("settings.view");
   const { year } = (await searchParams) as { year?: string };
   const [settings, holidays] = await Promise.all([
     getSettings(),
@@ -16,6 +19,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const shown = year ? holidays.filter((h) => String(h.date.getUTCFullYear()) === year) : holidays;
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("settings.manage")}>
     <>
       <PageHeader title="Settings" description="Working calendar and defaults used for capacity and sprint planning." />
 
@@ -46,7 +50,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </Card>
 
         <Card title="Public holidays">
-          <EditOnly>
+          <Can perm="settings.manage">
           <ActionForm action={addHoliday} className="mb-4 grid gap-3 sm:grid-cols-[10rem_1fr_auto] sm:items-end">
             <Field label="Date">
               <Input type="date" name="date" required />
@@ -56,7 +60,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             </Field>
             <SubmitButton>Add</SubmitButton>
           </ActionForm>
-          </EditOnly>
+          </Can>
 
           {years.length > 1 && (
             <form className="mb-3 flex items-center gap-2 text-sm">
@@ -102,5 +106,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </Card>
       </div>
     </>
+    </RoleProvider>
   );
 }

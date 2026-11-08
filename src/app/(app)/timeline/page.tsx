@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { loadAnalytics, type TaskView } from "@/lib/analytics";
 import { filterTimeline } from "@/lib/timeline-filter";
 import { TimelineTabs } from "@/components/timeline-tabs";
@@ -24,6 +26,7 @@ function status(t: TaskView) {
 }
 
 export default async function TimelinePage({ searchParams }: PageProps<"/timeline">) {
+  const me = await requirePageAccess("timeline.view");
   const f = (await searchParams) as Q;
   const a = await loadAnalytics();
   const zoom = f.zoom === "week" ? "week" : "day";
@@ -76,6 +79,7 @@ export default async function TimelinePage({ searchParams }: PageProps<"/timelin
   const exportQuery = toQuery({ ...keep, zoom });
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("timeline.act")}>
     <>
       <PageHeader
         title="Timeline"
@@ -234,5 +238,6 @@ export default async function TimelinePage({ searchParams }: PageProps<"/timelin
       </Card>
       <p className="mt-2 text-xs text-slate-400">Showing {formatDate(from)} – {formatDate(to)} · total scheduled {fmtH(tasks.reduce((s, t) => s + (t.plan ? Object.values(t.plan.byDay).reduce((x, y) => x + y, 0) : 0), 0))}</p>
     </>
+    </RoleProvider>
   );
 }

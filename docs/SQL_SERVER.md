@@ -20,10 +20,12 @@ Handover notes for the DevOps engineer. The database layer now targets **Microso
 | Name | Value |
 |---|---|
 | `DATABASE_URL` | `sqlserver://HOST:1433;database=solo_scrum;user=USER;password=PASSWORD;encrypt=true;trustServerCertificate=false` (named instance: `sqlserver://HOST\INSTANCE;...`; self-signed certificate: `trustServerCertificate=true`; a password containing `;` `=` `{` `}` goes in `{braces}`) |
-| `APP_PASSWORD` | Owner password (user name `khaled elbauomy`) |
-| `VIEWER_PASSWORD` | View-only password (user name `remoon milad`); empty = that account cannot sign in |
+| `APP_PASSWORD` | Used once: on an empty database, the first sign-in creates the owner (`khaled elbauomy`, Administrator) with this password |
+| `VIEWER_PASSWORD` | Used once: creates `remoon milad` (Viewer) the same way; empty = that user is not created |
 | `SESSION_SECRET` | Random text, at least 32 characters |
 | `ADMIN_USERNAME`, `VIEWER_USERNAME` | Optional, to change the user names |
+| `MS_ENTRA_TENANT_ID`, `MS_ENTRA_CLIENT_ID`, `MS_ENTRA_CLIENT_SECRET` | Optional: "Sign in with Microsoft", from ACT's app registration in Microsoft Entra ID |
+| `APP_URL` | The public HTTPS address of the app, for example `https://scrum.act-eg.com`. Register `APP_URL/api/auth/microsoft/callback` as the redirect URI. Needed only for Microsoft sign-in |
 | `NODE_ENV` | `production` |
 | `PORT` | Optional, default 3000 |
 
@@ -51,6 +53,7 @@ add the target to `binaryTargets` in `prisma/schema.prisma` (it lists `native` a
 | IDs | `NVARCHAR(36)` |
 | Deletes | No `RESTRICT` in SQL Server, so `NO ACTION` is used (same effect: a row still in use cannot be deleted). Deleting a sprint clears `WorkItem.sprintId` in the app, because SQL Server forbids a second automatic delete path to sprint commitments |
 | Searches | Case-insensitive through the database collation |
+| Optional unique columns (`User.email`, `User.memberId`) | Filtered unique indexes (`WHERE ... IS NOT NULL`), written by hand in migration `20261109090000_users_roles`, because a plain unique index allows only one empty value. If a future migration is generated with `prisma migrate diff`, keep these two indexes filtered. Because of them, any script or tool that writes to the `User` table needs `SET QUOTED_IDENTIFIER ON` (the app and SQL Server Management Studio already do this; `sqlcmd` needs the `-I` option) |
 
 ## Moving the current data from Neon (PostgreSQL)
 

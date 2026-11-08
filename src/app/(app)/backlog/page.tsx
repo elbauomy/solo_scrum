@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess, can } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { db } from "@/lib/db";
 import { hasItemFilters, loadBacklog, type BacklogFilters } from "@/lib/backlog";
 import { loadItemFormOptions } from "@/lib/item-options";
@@ -6,11 +8,12 @@ import { PRIORITIES, PRIORITY_LABEL, STATUS_LABEL, TYPES, TYPE_LABEL } from "@/l
 import { BacklogTree } from "@/components/work-items/backlog-tree";
 import { NewItemForm } from "@/components/work-items/new-item-form";
 import { Card, Empty, LinkButton, PageHeader, cn, primaryButton } from "@/components/ui";
-import { EditOnly, canEdit } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 const selectCls = "rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm";
 
 export default async function BacklogPage({ searchParams }: PageProps<"/backlog">) {
+  const me = await requirePageAccess("backlog.view");
   const f = (await searchParams) as BacklogFilters;
   const [groups, squads, allLobs, members] = await Promise.all([
     loadBacklog(f),
@@ -25,8 +28,9 @@ export default async function BacklogPage({ searchParams }: PageProps<"/backlog"
   const totalCount = groups.reduce((s, g) => s + g.totalItems, 0);
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("backlog.edit")}>
     <>
-      <PageHeader title="Backlog" description="Epics → Features → User Stories / Bugs → Tasks for every line of business." actions={(await canEdit()) ? <LinkButton href="/sprints/import">Import from sprint planning sheet</LinkButton> : undefined} />
+      <PageHeader title="Backlog" description="Epics → Features → User Stories / Bugs → Tasks for every line of business." actions={(await can("sprints.import")) ? <LinkButton href="/sprints/import">Import from sprint planning sheet</LinkButton> : undefined} />
 
       <Card className="mb-4">
         <form className="flex flex-wrap items-end gap-2">
@@ -73,7 +77,7 @@ export default async function BacklogPage({ searchParams }: PageProps<"/backlog"
         </form>
       </Card>
 
-      <EditOnly>
+      <Can perm="backlog.edit">
       <Card title="New item" className="mb-4">
         {options.lobs.length === 0 ? (
           <Empty>
@@ -83,7 +87,7 @@ export default async function BacklogPage({ searchParams }: PageProps<"/backlog"
           <NewItemForm {...options} defaultLobId={f.lob} />
         )}
       </Card>
-      </EditOnly>
+      </Can>
 
       {groups.length === 0 ? (
         <Card><Empty>No lines of business match these filters.</Empty></Card>
@@ -110,5 +114,6 @@ export default async function BacklogPage({ searchParams }: PageProps<"/backlog"
         </>
       )}
     </>
+    </RoleProvider>
   );
 }

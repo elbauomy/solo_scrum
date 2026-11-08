@@ -1,6 +1,6 @@
-/** Thrown when a view-only account tries to change something. */
+/** Thrown when the signed-in user's role does not allow an action. */
 export class ForbiddenError extends Error {
   constructor() {
-    super("This account is view-only. It cannot change anything.");
+    super("Your role does not allow this. Ask an administrator if you need access.");
   }
 }

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
@@ -8,6 +10,7 @@ import { Badge, Card, Empty, LinkButton, PageHeader, Table, Td, Th } from "@/com
 import { SquadFields } from "@/components/entity-fields";
 
 export default async function SquadPage({ params }: PageProps<"/squads/[id]">) {
+  const me = await requirePageAccess("squads.view");
   const { id } = await params;
   const [squad, settings] = await Promise.all([
     db.squad.findUnique({
@@ -22,6 +25,7 @@ export default async function SquadPage({ params }: PageProps<"/squads/[id]">) {
   if (!squad) notFound();
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("squads.manage")}>
     <>
       <PageHeader
         title={squad.name}
@@ -96,5 +100,6 @@ export default async function SquadPage({ params }: PageProps<"/squads/[id]">) {
         </div>
       </div>
     </>
+    </RoleProvider>
   );
 }

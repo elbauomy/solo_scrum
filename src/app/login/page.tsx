@@ -3,6 +3,19 @@ import { login } from "@/lib/actions/auth";
 import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { Field, Input } from "@/components/ui";
 import { PasswordInput } from "@/components/ui/password-input";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { firstAllowedPath } from "@/lib/permissions";
+import { ssoConfig } from "@/lib/sso";
+
+const SSO_MESSAGES: Record<string, string> = {
+  "no-account": "Your Microsoft account is not linked to a user here. Ask an administrator to add your work email to your user.",
+  cancelled: "Microsoft sign-in was cancelled.",
+  expired: "The Microsoft sign-in took too long or was opened in another browser. Please try again.",
+  failed: "Microsoft sign-in could not be completed. Please try again, or sign in with your password.",
+  "no-email": "Your Microsoft account did not share an email address, so it cannot be matched to a user.",
+  off: "Microsoft sign-in is not switched on.",
+};
 
 export const metadata = { title: "Sign in · Solo Scrum" };
 
@@ -12,7 +25,12 @@ const POINTS = [
   ["Report", "Burndown, velocity and health scores, ready to export."],
 ];
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const me = await getCurrentUser();
+  if (me) redirect(me.mustChangePassword ? "/profile" : firstAllowedPath(me.permissions));
+  const { sso } = (await searchParams) as { sso?: string };
+  const ssoMessage = sso ? SSO_MESSAGES[sso] ?? SSO_MESSAGES.failed : null;
+  const ssoOn = ssoConfig() != null;
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.15fr_1fr]">
       {/* Brand panel */}
@@ -50,9 +68,12 @@ export default function LoginPage() {
           <div className="w-full max-w-sm">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
             <p className="mt-1 text-sm text-slate-500">Sign in to Solo Scrum to continue.</p>
+            {ssoMessage && (
+              <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{ssoMessage}</p>
+            )}
             <div className="mt-7 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_40px_-20px_rgba(0,0,0,0.15)]">
               <ActionForm action={login} className="space-y-4" resetOnSuccess={false}>
-                <Field label="User name">
+                <Field label="User name or email">
                   <Input name="username" required autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} />
                 </Field>
                 <Field label="Password">
@@ -60,6 +81,20 @@ export default function LoginPage() {
                 </Field>
                 <SubmitButton className="w-full py-2.5">Sign in</SubmitButton>
               </ActionForm>
+              {ssoOn && (
+                <>
+                  <div className="my-5 flex items-center gap-3 text-xs text-slate-400" aria-hidden>
+                    <span className="h-px flex-1 bg-slate-200" />or<span className="h-px flex-1 bg-slate-200" />
+                  </div>
+                  <a
+                    href="/api/auth/microsoft/start"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50"
+                  >
+                    <svg viewBox="0 0 21 21" aria-hidden className="h-4 w-4"><rect x="1" y="1" width="9" height="9" fill="#f25022" /><rect x="11" y="1" width="9" height="9" fill="#7fba00" /><rect x="1" y="11" width="9" height="9" fill="#00a4ef" /><rect x="11" y="11" width="9" height="9" fill="#ffb900" /></svg>
+                    Sign in with Microsoft
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,6 @@
 // Session token helpers. Safe to use from proxy.ts (no Node-only imports).
+// The token only says WHO is signed in (user id + session version). What they may do is read from the database
+// on every request, so a role or permission change applies at once.
 import { SignJWT, jwtVerify } from "jose";
 
 export const SESSION_COOKIE = "act_session";
@@ -12,24 +14,23 @@ function secretKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export type SessionRole = "admin" | "viewer";
-export type SessionData = { role: SessionRole; name: string };
+export type SessionData = { userId: string; version: number };
 
-export async function createSessionToken(role: SessionRole, name: string): Promise<string> {
-  return new SignJWT({ role, name })
+export async function createSessionToken(userId: string, version: number): Promise<string> {
+  return new SignJWT({ uid: userId, v: version })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
     .sign(secretKey());
 }
 
-/** Who is signed in, or null when the token is missing, forged or expired. */
+/** The signed-in user id and session version, or null when the token is missing, forged, expired or from the old two-account sign-in. */
 export async function readSession(token: string | undefined): Promise<SessionData | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-    if (payload.role !== "admin" && payload.role !== "viewer") return null;
-    return { role: payload.role, name: typeof payload.name === "string" && payload.name ? payload.name : "khaled elbauomy" };
+    if (typeof payload.uid !== "string" || !payload.uid || typeof payload.v !== "number") return null;
+    return { userId: payload.uid, version: payload.v };
   } catch {
     return null;
   }

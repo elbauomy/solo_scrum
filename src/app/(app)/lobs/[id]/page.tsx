@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { effectiveSprintLength } from "@/lib/capacity";
@@ -8,6 +10,7 @@ import { Card, LinkButton, PageHeader } from "@/components/ui";
 import { LobFields } from "@/components/entity-fields";
 
 export default async function LobPage({ params }: PageProps<"/lobs/[id]">) {
+  const me = await requirePageAccess("lobs.view");
   const { id } = await params;
   const [lob, squads, settings] = await Promise.all([
     db.lineOfBusiness.findUnique({ where: { id }, include: { squad: true } }),
@@ -19,6 +22,7 @@ export default async function LobPage({ params }: PageProps<"/lobs/[id]">) {
   const sprint = effectiveSprintLength(lob.sprintLengthDays, lob.squad.sprintLengthDays, settings.defaultSprintLengthDays);
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("lobs.manage")}>
     <>
       <PageHeader
         title={lob.name}
@@ -41,5 +45,6 @@ export default async function LobPage({ params }: PageProps<"/lobs/[id]">) {
         </div>
       </Card>
     </>
+    </RoleProvider>
   );
 }

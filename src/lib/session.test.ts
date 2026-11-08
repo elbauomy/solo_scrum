@@ -1,34 +1,39 @@
-import { SignJWT } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
+import { SignJWT } from "jose";
 import { createSessionToken, isValidSessionToken, readSession } from "./session";
 
 beforeAll(() => {
   process.env.SESSION_SECRET = "test-secret-test-secret-test-secret-1234";
 });
 
-describe("session tokens", () => {
-  it("carry the role and the user name", async () => {
-    expect(await readSession(await createSessionToken("admin", "khaled elbauomy"))).toEqual({ role: "admin", name: "khaled elbauomy" });
-    expect(await readSession(await createSessionToken("viewer", "remoon milad"))).toEqual({ role: "viewer", name: "remoon milad" });
+describe("session token", () => {
+  it("carries the user id and session version", async () => {
+    const token = await createSessionToken("user-1", 3);
+    expect(await readSession(token)).toEqual({ userId: "user-1", version: 3 });
+    expect(await isValidSessionToken(token)).toBe(true);
   });
-  it("reject a missing, damaged or forged token", async () => {
-    const good = await createSessionToken("viewer", "remoon milad");
+
+  it("rejects missing, forged and tampered tokens", async () => {
     expect(await readSession(undefined)).toBeNull();
     expect(await readSession("not-a-token")).toBeNull();
-    // changing the payload (viewer -> admin) breaks the signature
-    const [h, p, sig] = good.split(".");
-    const forgedPayload = Buffer.from(JSON.stringify({ role: "admin", name: "remoon milad" })).toString("base64url");
-    expect(await readSession(`${h}.${forgedPayload}.${sig}`)).toBeNull();
-    expect(await isValidSessionToken(`${h}.${p}.${sig.slice(0, -2)}xx`)).toBe(false);
+    const token = await createSessionToken("user-1", 1);
+    const [h, , sig] = token.split(".");
+    const forgedBody = Buffer.from(JSON.stringify({ uid: "admin", v: 1 })).toString("base64url");
+    expect(await readSession(`${h}.${forgedBody}.${sig}`)).toBeNull();
+    const otherKey = new TextEncoder().encode("another-secret-another-secret-another-1");
+    const signedElsewhere = await new SignJWT({ uid: "user-1", v: 1 }).setProtectedHeader({ alg: "HS256" }).sign(otherKey);
+    expect(await readSession(signedElsewhere)).toBeNull();
   });
-  it("reject a token signed with another secret or with an unknown role", async () => {
-    const other = await new SignJWT({ role: "admin", name: "x" }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode("another-secret-another-secret-another-123"));
-    expect(await readSession(other)).toBeNull();
-    const unknown = await new SignJWT({ role: "root", name: "x" }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(process.env.SESSION_SECRET!));
-    expect(await readSession(unknown)).toBeNull();
-  });
-  it("reject an expired token", async () => {
-    const old = await new SignJWT({ role: "admin", name: "x" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt(1).setExpirationTime(2).sign(new TextEncoder().encode(process.env.SESSION_SECRET!));
+
+  it("does not accept tokens from the old two-account sign-in", async () => {
+    const key = new TextEncoder().encode(process.env.SESSION_SECRET);
+    const old = await new SignJWT({ role: "admin", name: "khaled elbauomy" }).setProtectedHeader({ alg: "HS256" }).sign(key);
     expect(await readSession(old)).toBeNull();
+  });
+
+  it("rejects expired tokens", async () => {
+    const key = new TextEncoder().encode(process.env.SESSION_SECRET);
+    const expired = await new SignJWT({ uid: "u", v: 1 }).setProtectedHeader({ alg: "HS256" }).setExpirationTime(Math.floor(Date.now() / 1000) - 10).sign(key);
+    expect(await readSession(expired)).toBeNull();
   });
 });

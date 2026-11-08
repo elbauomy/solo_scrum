@@ -4,7 +4,7 @@ import type { WorkItemStatus, WorkItemType } from "@/lib/enums";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db, type Tx } from "@/lib/db";
 import { type ActionState, toActionError } from "@/lib/action-state";
 import { PARENT_TYPES, PRIORITIES, TYPES, itemKey, nextRank, statusesFor, TYPE_LABEL, validateParent } from "@/lib/work-items";
@@ -44,7 +44,7 @@ function refresh() {
 }
 
 export async function createWorkItem(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("backlog.edit");
   try {
     const data = createSchema.parse(Object.fromEntries(formData.entries()));
     await db.$transaction(async (tx) => {
@@ -117,7 +117,7 @@ const updateSchema = z.object({
 type Change = { field: string; oldValue: string | null; newValue: string | null };
 
 export async function updateWorkItem(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("backlog.edit");
   try {
     const data = updateSchema.parse(Object.fromEntries(formData.entries()));
     await db.$transaction(async (tx) => {
@@ -203,7 +203,7 @@ export async function updateWorkItem(_prev: ActionState, formData: FormData): Pr
 
 /** Quick status change from lists and boards. */
 export async function setWorkItemStatus(id: string, status: WorkItemStatus): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("backlog.edit", "board.move");
   try {
     const item = await db.workItem.findUnique({ where: { id } });
     if (!item) return { error: "This item no longer exists." };
@@ -227,7 +227,7 @@ export async function setWorkItemStatus(id: string, status: WorkItemStatus): Pro
 
 /** Save a new order for items that share the same parent (or are top level in the same LOB). */
 export async function reorderWorkItems(orderedIds: string[]): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("backlog.edit");
   try {
     const ids = z.array(z.string().min(1)).min(1).max(1000).parse(orderedIds);
     const items = await db.workItem.findMany({ where: { id: { in: ids } }, select: { id: true, parentId: true, lobId: true } });
@@ -245,7 +245,7 @@ export async function reorderWorkItems(orderedIds: string[]): Promise<ActionStat
 }
 
 export async function deleteWorkItem(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("backlog.delete");
   const id = String(formData.get("id"));
   let backTo = "/backlog";
   try {
@@ -268,7 +268,7 @@ export async function deleteWorkItem(_prev: ActionState, formData: FormData): Pr
  * (select a parent and its whole tree, or just the leaves). Anything else is kept and listed.
  */
 export async function deleteWorkItems(ids: string[]): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("backlog.delete");
   try {
     const wanted = z.array(z.string().min(1)).max(3000).parse(ids);
     if (wanted.length === 0) return { error: "Tick at least one item first." };

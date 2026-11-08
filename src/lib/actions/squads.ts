@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { type ActionState, formObject, optionalInt, optionalText, requiredName, toActionError } from "@/lib/action-state";
 
@@ -14,7 +14,7 @@ const squadSchema = z.object({
 });
 
 export async function createSquad(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("squads.manage");
   try {
     await db.squad.create({ data: squadSchema.parse(formObject(formData)) });
   } catch (err) {
@@ -25,7 +25,7 @@ export async function createSquad(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function updateSquad(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("squads.manage");
   try {
     const id = String(formData.get("id"));
     await db.squad.update({ where: { id }, data: squadSchema.parse(formObject(formData)) });
@@ -37,7 +37,7 @@ export async function updateSquad(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function deleteSquad(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("squads.manage");
   const id = String(formData.get("id"));
   try {
     const squad = await db.squad.findUnique({

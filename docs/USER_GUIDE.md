@@ -2,8 +2,16 @@
 
 A simple rhythm for running your squads. Every list has filters at the top; the page address keeps them, so you can bookmark a view.
 
-## Signing in (two accounts)
-Sign in with a user name and a password. **khaled elbauomy** is the owner and can do everything. **remoon milad** is a view-only account: it can open every page, use the filters, and download reports and the backup, but cannot create, edit, delete, import or move anything (buttons and forms are hidden or locked, and the system refuses changes even if someone tries to force them). Passwords are set in Vercel (`APP_PASSWORD` and `VIEWER_PASSWORD`); to change one, edit it there and redeploy.
+## Signing in, users and roles
+- **Sign in** with your user name (or work email) and password. Your name and role show at the bottom of the menu; click them to open **your profile**, where you change your password.
+- **Users** (*Administration → Users*): add a user, give them a role and a temporary password, and optionally link them to a member. On a member's page, **Give sign-in access** does the same with the name filled in. A user with a temporary password must choose their own at the first sign-in. **Reset password** gives a new temporary password and signs them out everywhere. Untick **Can sign in** to disable an account without deleting it.
+- **Roles** (*Administration → Roles & Permissions*): a role is a name plus a list of permissions, grouped by page (Squads, Backlog, Sprints, Sprint Board, Timeline, Standup, Reports, Settings, Import & Backup, Users, Roles…). Each user has exactly one role. Giving any permission on a page also gives "View" on it. Changes apply at once, without signing in again.
+- **Administrator** is built in: it has every permission and cannot be changed. The system always keeps at least one active administrator, and nobody can disable or delete their own account.
+- The menu only shows the pages your role may open, and the system refuses any change your role does not allow, even if someone tries to force it.
+- The first sign-in after this update turned the two earlier accounts into users: **khaled elbauomy** (Administrator) and **remoon milad** (Viewer), with their existing passwords.
+
+## Sign in with Microsoft (optional)
+When it is switched on, the login page shows **Sign in with Microsoft**. It matches the Microsoft account to a user by **work email**, so add each person's email on their user first; nobody gets in just by having a Microsoft account. To switch it on, ACT's IT registers the app in Microsoft Entra ID (see the approvals document) and gives four values to put in the hosting settings: `MS_ENTRA_TENANT_ID`, `MS_ENTRA_CLIENT_ID`, `MS_ENTRA_CLIENT_SECRET`, and `APP_URL` (this site's address). The redirect address to register is `APP_URL` followed by `/api/auth/microsoft/callback`.
 
 ## One-time setup
 1. **Settings** — tick your working days, set hours per day, the default sprint length, and add public holidays.

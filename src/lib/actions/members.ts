@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDate } from "@/lib/dates";
 import { type ActionState, isoDate, optionalText, requiredName, toActionError } from "@/lib/action-state";
@@ -19,7 +19,7 @@ const weeklyHours = z.coerce
   .max(168, "Hours per week cannot exceed 168");
 
 export async function createMember(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     const data = memberSchema.parse({ name: formData.get("name"), role: formData.get("role") ?? "" });
     const squadId = String(formData.get("squadId") ?? "");
@@ -38,7 +38,7 @@ export async function createMember(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function updateMember(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     const id = String(formData.get("id"));
     const data = memberSchema.parse({ name: formData.get("name"), role: formData.get("role") ?? "" });
@@ -51,7 +51,7 @@ export async function updateMember(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function deleteMember(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     await db.member.delete({ where: { id: String(formData.get("id")) } });
   } catch (err) {
@@ -62,7 +62,7 @@ export async function deleteMember(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function saveMembership(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     const memberId = String(formData.get("memberId"));
     const squadId = z.string().min(1, "Please choose a squad").parse(formData.get("squadId"));
@@ -85,7 +85,7 @@ export async function saveMembership(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function removeMembership(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     await db.squadMembership.delete({ where: { id: String(formData.get("id")) } });
   } catch (err) {
@@ -100,7 +100,7 @@ const leaveSchema = z
   .refine((v) => v.startDate <= v.endDate, { message: "End date must be on or after the start date" });
 
 export async function addLeave(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     const memberId = String(formData.get("memberId"));
     const data = leaveSchema.parse({
@@ -119,7 +119,7 @@ export async function addLeave(_prev: ActionState, formData: FormData): Promise<
 }
 
 export async function deleteLeave(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     await db.leave.delete({ where: { id: String(formData.get("id")) } });
   } catch (err) {
@@ -134,7 +134,7 @@ export async function deleteLeave(_prev: ActionState, formData: FormData): Promi
  * Fields are named `hours_<lobId>`; empty or 0 removes the reservation. Whatever is left stays shared by the squad's lines.
  */
 export async function saveLobAllocations(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     const membershipId = String(formData.get("membershipId"));
     const membership = await db.squadMembership.findUnique({ where: { id: membershipId }, include: { squad: { include: { lobs: { select: { id: true } } } } } });
@@ -169,7 +169,7 @@ export async function saveLobAllocations(_prev: ActionState, formData: FormData)
 
 /** Delete the selected members. Their tasks become unassigned; their squad hours, leave, sprint capacity and standup notes are removed with them. */
 export async function deleteMembers(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("members.manage");
   try {
     const ids = formData.getAll("id").map(String).filter(Boolean);
     if (ids.length === 0) return { error: "Tick at least one member first." };

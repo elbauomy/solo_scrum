@@ -31,8 +31,21 @@ function file(buffer: Buffer, name: string) {
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ name: string }> }) {
-  await requireSession();
+  const me = await requireSession();
   const { name } = await ctx.params;
+  // Each download needs the permission of the page it comes from.
+  const needed: Record<string, string[]> = {
+    report: ["reports.export"],
+    backlog: ["backlog.view"],
+    timeline: ["timeline.view"],
+    "daily-plan": ["timeline.view"],
+    standup: ["standup.view"],
+    backup: ["data.backup"],
+    template: ["data.import"],
+  };
+  if (!(needed[name] ?? []).some((p) => me.permissions.has(p))) {
+    return NextResponse.json({ error: "Your role does not allow this download." }, { status: 403 });
+  }
   const q = params(req);
 
   switch (name) {

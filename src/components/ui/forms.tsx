@@ -55,9 +55,9 @@ export function ActionForm({
           {state.error}
         </p>
       )}
-      {state.ok && successMessage && (
+      {state.ok && (state.message || successMessage) && (
         <p role="status" className="mt-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-          {successMessage}
+          {state.message || successMessage}
         </p>
       )}
     </form>
