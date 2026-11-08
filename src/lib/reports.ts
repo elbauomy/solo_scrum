@@ -1,5 +1,5 @@
 import "server-only";
-import type { WorkItemType } from "@prisma/client";
+import type { WorkItemType } from "@/lib/enums";
 import { db } from "./db";
 import { loadAnalytics, type Analytics, type SprintView } from "./analytics";
 import { addDays, formatDate, toISODate } from "./dates";

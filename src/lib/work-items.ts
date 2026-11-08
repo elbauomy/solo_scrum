@@ -1,5 +1,5 @@
 // Work item rules shared by pages and actions. No database access, so it is easy to test.
-import type { Priority, WorkItemStatus, WorkItemType } from "@prisma/client";
+import type { Priority, WorkItemStatus, WorkItemType } from "@/lib/enums";
 
 export const TYPES: WorkItemType[] = ["EPIC", "FEATURE", "STORY", "BUG", "TASK"];
 

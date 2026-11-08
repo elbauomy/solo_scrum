@@ -39,7 +39,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
             type: { in: ["STORY", "BUG"] },
             sprintId: null,
             status: { not: "DONE" },
-            ...(q ? { title: { contains: q, mode: "insensitive" as const } } : {}),
+            ...(q ? { title: { contains: q } } : {}),
           },
           orderBy: [{ priority: "asc" }, { rank: "asc" }, { number: "asc" }],
           include: { children: { where: { type: "TASK" }, select: { estimateHours: true, status: true } } },

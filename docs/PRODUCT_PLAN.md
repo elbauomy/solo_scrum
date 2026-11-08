@@ -25,7 +25,7 @@ releases, the timeline and reports, following ACT's own process rather than stan
 | Export | Excel + PDF for every report, Excel for lists, full backup |
 | Azure DevOps | Two-way sync is built but switched off until IT and ACT management approve it. It is kept on the `azure-devops-sync` branch. |
 | Language | English only |
-| Hosting | 100% free: Vercel (Hobby) + Neon + GitHub. `*.netlify.app` is blocked on the owner's networks. |
+| Hosting | ACT servers with Microsoft SQL Server (moving from the free Vercel + Neon setup). |
 | Import | The team's sprint planning sheet (Sonata layout, .xlsx or .csv) creates/updates the sprint, member capacity, user stories and tasks. A simple work-item template import also exists. |
 
 ## Phases (all built)

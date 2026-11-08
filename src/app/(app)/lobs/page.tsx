@@ -14,7 +14,7 @@ export default async function LobsPage({ searchParams }: PageProps<"/lobs">) {
     db.lineOfBusiness.findMany({
       where: {
         ...(squad ? { squadId: squad } : {}),
-        ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
+        ...(q ? { name: { contains: q } } : {}),
       },
       orderBy: { name: "asc" },
       include: { squad: true, _count: { select: { workItems: true } } },

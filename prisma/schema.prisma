@@ -3,33 +3,33 @@ generator client {
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
+// Microsoft SQL Server. Notes on what differs from other databases are in docs/SQL_SERVER.md.
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
 }
 
 /// System-wide settings. Always exactly one row with id = 1.
 model Setting {
   id                      Int      @id @default(1)
-  /// Working weekdays: 0 = Sunday ... 6 = Saturday
-  workingDays             Int[]    @default([1, 2, 3, 4, 5])
+  /// Working weekdays as a comma-separated list: 0 = Sunday ... 6 = Saturday (read through src/lib/settings.ts)
+  workingDays             String   @default("1,2,3,4,5") @db.NVarChar(20)
   defaultDailyHours       Float    @default(8)
   defaultSprintLengthDays Int      @default(14)
   updatedAt               DateTime @updatedAt
 }
 
 model Holiday {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @db.NVarChar(36)
   date      DateTime @unique @db.Date
   name      String
   createdAt DateTime @default(now())
 }
 
 model Squad {
-  id               String            @id @default(cuid())
-  name             String            @unique
-  description      String            @default("")
+  id               String            @id @default(cuid()) @db.NVarChar(36)
+  name             String            @unique @db.NVarChar(200)
+  description      String            @default("") @db.NVarChar(Max)
   /// Overrides the system default sprint length (days) for this squad's LOBs
   sprintLengthDays Int?
   lobs             LineOfBusiness[]
@@ -41,23 +41,23 @@ model Squad {
 
 /// A Line of Business (LOB) is the "project". Owned by exactly one squad.
 model LineOfBusiness {
-  id               String                @id @default(cuid())
-  name             String                @unique
-  description      String                @default("")
-  squadId          String
-  squad            Squad                 @relation(fields: [squadId], references: [id], onDelete: Restrict)
+  id               String                @id @default(cuid()) @db.NVarChar(36)
+  name             String                @unique @db.NVarChar(200)
+  description      String                @default("") @db.NVarChar(Max)
+  squadId          String                @db.NVarChar(36)
+  squad            Squad                 @relation(fields: [squadId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   /// Overrides the squad / system sprint length (days)
   sprintLengthDays Int?
   /// Short code used in item IDs, e.g. "RB" -> RB-12
-  key              String                @unique
+  key              String                @unique @map("code") @db.NVarChar(20)
   /// Next item number to hand out in this LOB
   nextItemNumber   Int                   @default(1)
   /// Azure DevOps sync columns: kept but unused while the sync is switched off (it lives on the azure-devops-sync branch).
   /// Name of the Azure DevOps project this line syncs with (empty = not linked)
-  adoProject       String?
+  adoProject       String?               @db.NVarChar(200)
   adoLastSyncAt    DateTime?
   /// Summary of the last sync (see SyncSummary in src/lib/ado-sync.ts)
-  adoLastResult    Json?
+  adoLastResult    String?               @db.NVarChar(Max)
   workItems        WorkItem[]
   sprints          Sprint[]
   releases         Release[]
@@ -70,7 +70,7 @@ model LineOfBusiness {
 
 /// Squad member. A name only - members do not log in.
 model Member {
-  id           String              @id @default(cuid())
+  id           String              @id @default(cuid()) @db.NVarChar(36)
   name         String
   role         String              @default("")
   active       Boolean             @default(true)
@@ -86,12 +86,12 @@ model Member {
 
 /// Hours per week a member gives to a squad.
 model SquadMembership {
-  id             String                @id @default(cuid())
-  memberId       String
-  squadId        String
+  id             String                @id @default(cuid()) @db.NVarChar(36)
+  memberId       String                @db.NVarChar(36)
+  squadId        String                @db.NVarChar(36)
   weeklyHours    Float
-  member         Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  squad          Squad                 @relation(fields: [squadId], references: [id], onDelete: Restrict)
+  member         Member                @relation(fields: [memberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  squad          Squad                 @relation(fields: [squadId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   /// Optional split of the weekly hours across the squad's lines of business
   lobAllocations MemberLobAllocation[]
 
@@ -101,82 +101,63 @@ model SquadMembership {
 
 /// Full days off, start and end inclusive.
 model Leave {
-  id        String   @id @default(cuid())
-  memberId  String
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid()) @db.NVarChar(36)
+  memberId  String   @db.NVarChar(36)
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   startDate DateTime @db.Date
   endDate   DateTime @db.Date
-  note      String   @default("")
+  note      String   @default("") @db.NVarChar(Max)
   createdAt DateTime @default(now())
 
   @@index([memberId])
 }
 
-enum WorkItemType {
-  EPIC
-  FEATURE
-  STORY
-  BUG
-  TASK
-}
-
-/// Story/Bug: NEW, APPROVED, COMMITTED, DONE. Task: NEW, IN_PROGRESS, DONE.
-/// Epic/Feature progress is calculated from their children; their status stays NEW.
-enum WorkItemStatus {
-  NEW
-  APPROVED
-  COMMITTED
-  IN_PROGRESS
-  DONE
-}
-
-enum Priority {
-  HIGH
-  MEDIUM
-  LOW
-}
-
 model WorkItem {
-  id                 String             @id @default(cuid())
-  type               WorkItemType
+  id                 String             @id @default(cuid()) @db.NVarChar(36)
+  /// EPIC, FEATURE, STORY, BUG or TASK (see src/lib/enums.ts)
+  type               String             @db.NVarChar(20)
   /// Sequential number inside the LOB (shown as KEY-number)
   number             Int
   title              String
-  description        String             @default("")
-  acceptanceCriteria String             @default("")
-  status             WorkItemStatus     @default(NEW)
-  priority           Priority           @default(MEDIUM)
+  description        String             @default("") @db.NVarChar(Max)
+  acceptanceCriteria String             @default("") @db.NVarChar(Max)
+  /// Story/Bug: NEW, APPROVED, COMMITTED, DONE. Task: NEW, IN_PROGRESS, DONE. Epics and features stay NEW.
+  status             String             @default("NEW") @db.NVarChar(20)
+  /// HIGH, MEDIUM or LOW
+  priority           String             @default("MEDIUM") @db.NVarChar(10)
   /// Manual order among siblings (lower comes first)
   rank               Float              @default(0)
-  lobId              String
-  lob                LineOfBusiness     @relation(fields: [lobId], references: [id], onDelete: Restrict)
-  parentId           String?
-  parent             WorkItem?          @relation("WorkItemTree", fields: [parentId], references: [id], onDelete: Restrict)
+  lobId              String             @db.NVarChar(36)
+  lob                LineOfBusiness     @relation(fields: [lobId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parentId           String?            @db.NVarChar(36)
+  parent             WorkItem?          @relation("WorkItemTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children           WorkItem[]         @relation("WorkItemTree")
   /// Tasks only
-  assigneeId         String?
-  assignee           Member?            @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId         String?            @db.NVarChar(36)
+  assignee           Member?            @relation(fields: [assigneeId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   /// Tasks only
   estimateHours      Float?
   blocked            Boolean            @default(false)
-  blockedReason      String             @default("")
+  blockedReason      String             @default("") @db.NVarChar(Max)
   /// Set when status becomes DONE, cleared when it leaves DONE
   doneAt             DateTime?
   /// Stories, bugs and their tasks. Tasks follow their story; done tasks stay in the sprint they were finished in.
-  sprintId           String?
-  sprint             Sprint?            @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  sprintId           String?            @db.NVarChar(36)
+  /// No automatic clearing on delete (SQL Server forbids two delete paths to commitments); the app clears it first.
+  sprint             Sprint?            @relation(fields: [sprintId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   history            WorkItemHistory[]
   commitments        SprintCommitment[]
   baseline           TaskBaseline?
   /// Azure DevOps work item id when this item is linked
   adoId              Int?
   /// What both sides agreed on at the last sync (see ItemSnapshot in src/lib/ado-sync.ts)
-  adoSnapshot        Json?
+  adoSnapshot        String?            @db.NVarChar(Max)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
   @@unique([lobId, number])
-  @@unique([lobId, adoId])
+  /// Not unique here: SQL Server allows only one empty value in a unique index (the sync branch adds a filtered unique index).
+  @@index([lobId, adoId])
   @@index([parentId])
   @@index([assigneeId])
   @@index([lobId, type])
@@ -185,45 +166,38 @@ model WorkItem {
 
 /// One row per changed field, used for audit and for reports (cycle time, burndown).
 model WorkItemHistory {
-  id         String   @id @default(cuid())
-  workItemId String
-  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid()) @db.NVarChar(36)
+  workItemId String   @db.NVarChar(36)
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   /// created, title, status, priority, assignee, estimate, blocked, parent
-  field      String
-  oldValue   String?
-  newValue   String?
+  field      String   @db.NVarChar(50)
+  oldValue   String?  @db.NVarChar(Max)
+  newValue   String?  @db.NVarChar(Max)
   changedAt  DateTime @default(now())
 
   @@index([workItemId, changedAt])
   @@index([field, changedAt])
 }
 
-enum SprintState {
-  PLANNED
-  ACTIVE
-  /// Work is on hold (for example the team was pulled onto something else). Tasks are not scheduled until it resumes.
-  PAUSED
-  CLOSED
-}
-
 /// A sprint belongs to one line of business. Sprints may overlap.
 model Sprint {
-  id          String              @id @default(cuid())
-  lobId       String
-  lob         LineOfBusiness      @relation(fields: [lobId], references: [id], onDelete: Restrict)
+  id          String              @id @default(cuid()) @db.NVarChar(36)
+  lobId       String              @db.NVarChar(36)
+  lob         LineOfBusiness      @relation(fields: [lobId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   name        String
-  goal        String              @default("")
+  goal        String              @default("") @db.NVarChar(Max)
   startDate   DateTime            @db.Date
   endDate     DateTime            @db.Date
-  state       SprintState         @default(PLANNED)
+  /// PLANNED, ACTIVE, PAUSED (work on hold, tasks not scheduled) or CLOSED
+  state       String              @default("PLANNED") @db.NVarChar(10)
   /// Azure DevOps iteration path, e.g. SONATA/Release 6/Sprint 62 (backslashes)
-  adoPath     String?
-  releaseId   String?
-  release     Release?            @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  adoPath     String?             @db.NVarChar(400)
+  releaseId   String?             @db.NVarChar(36)
+  release     Release?            @relation(fields: [releaseId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   startedAt   DateTime?
   closedAt    DateTime?
   /// Metrics saved when the sprint is closed (see SprintSummary in src/lib/analytics.ts)
-  result      Json?
+  result      String?             @db.NVarChar(Max)
   items       WorkItem[]
   commitments SprintCommitment[]
   shares      SprintMemberShare[]
@@ -238,38 +212,38 @@ model Sprint {
 
 /// Optional override: percent of a member's squad hours given to this sprint on days it overlaps other sprints.
 model SprintMemberShare {
-  id       String @id @default(cuid())
-  sprintId String
-  memberId String
-  percent  Float
-  sprint   Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
-  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid()) @db.NVarChar(36)
+  sprintId String @db.NVarChar(36)
+  memberId String @db.NVarChar(36)
+  percent  Float  @map("sharePercent")
+  sprint   Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([sprintId, memberId])
 }
 
 /// Snapshot taken when a sprint starts. Rows for tasks hold their hours; rows for stories/bugs hold 0.
 model SprintCommitment {
-  id          String   @id @default(cuid())
-  sprintId    String
-  workItemId  String
+  id          String   @id @default(cuid()) @db.NVarChar(36)
+  sprintId    String   @db.NVarChar(36)
+  workItemId  String   @db.NVarChar(36)
   hours       Float    @default(0)
   /// Set when the sprint closes: story/bug was committed but not Done
   carriedOver Boolean  @default(false)
-  sprint      Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
-  workItem    WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  sprint      Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  workItem    WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([sprintId, workItemId])
 }
 
 /// A release (deployment) belongs to one line of business and contains several of its sprints.
 model Release {
-  id           String              @id @default(cuid())
-  lobId        String
-  lob          LineOfBusiness      @relation(fields: [lobId], references: [id], onDelete: Restrict)
+  id           String              @id @default(cuid()) @db.NVarChar(36)
+  lobId        String              @db.NVarChar(36)
+  lob          LineOfBusiness      @relation(fields: [lobId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   name         String
   version      String              @default("")
-  notes        String              @default("")
+  notes        String              @default("") @db.NVarChar(Max)
   targetDate   DateTime            @db.Date
   deployedDate DateTime?           @db.Date
   sprints      Sprint[]
@@ -281,12 +255,12 @@ model Release {
 }
 
 model ReleaseDateChange {
-  id        String   @id @default(cuid())
-  releaseId String
-  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid()) @db.NVarChar(36)
+  releaseId String   @db.NVarChar(36)
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   oldDate   DateTime @db.Date
   newDate   DateTime @db.Date
-  reason    String   @default("")
+  reason    String   @default("") @db.NVarChar(Max)
   changedAt DateTime @default(now())
 
   @@index([releaseId, changedAt])
@@ -294,29 +268,29 @@ model ReleaseDateChange {
 
 /// Dates the Scrum Master accepted for a task, so later slips are measured against them.
 model TaskBaseline {
-  id            String   @id @default(cuid())
-  workItemId    String   @unique
-  workItem      WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid()) @db.NVarChar(36)
+  workItemId    String   @unique @db.NVarChar(36)
+  workItem      WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   baselineStart DateTime @db.Date
   baselineEnd   DateTime @db.Date
   acceptedAt    DateTime @default(now())
 }
 
 model StandupEntry {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @db.NVarChar(36)
   date      DateTime @db.Date
-  squadId   String
-  memberId  String
-  squad     Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade)
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  squadId   String   @db.NVarChar(36)
+  memberId  String   @db.NVarChar(36)
+  squad     Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   /// The member's status for the day, typed by hand
-  status    String   @default("")
+  status    String   @default("") @db.NVarChar(Max)
   /// The member is not working that day (leave, sick, day off...)
-  off       Boolean  @default(false)
-  offReason String   @default("")
-  yesterday String   @default("")
-  today     String   @default("")
-  blockers  String   @default("")
+  off       Boolean  @default(false) @map("isOff")
+  offReason String   @default("") @db.NVarChar(Max)
+  yesterday String   @default("") @db.NVarChar(Max)
+  today     String   @default("") @db.NVarChar(Max)
+  blockers  String   @default("") @db.NVarChar(Max)
   updatedAt DateTime @updatedAt
 
   @@unique([date, squadId, memberId])
@@ -326,12 +300,12 @@ model StandupEntry {
 /// Hours per week a member reserves for one line of business inside a squad.
 /// Whatever is left of the squad hours stays shared by all of the squad's lines of business.
 model MemberLobAllocation {
-  id           String          @id @default(cuid())
-  membershipId String
-  lobId        String
+  id           String          @id @default(cuid()) @db.NVarChar(36)
+  membershipId String          @db.NVarChar(36)
+  lobId        String          @db.NVarChar(36)
   weeklyHours  Float
-  membership   SquadMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  lob          LineOfBusiness  @relation(fields: [lobId], references: [id], onDelete: Cascade)
+  membership   SquadMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lob          LineOfBusiness  @relation(fields: [lobId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([membershipId, lobId])
   @@index([lobId])
@@ -340,9 +314,9 @@ model MemberLobAllocation {
 /// A member's task capacity for one sprint, usually imported from the sprint planning sheet:
 /// initial hours x availability, minus meetings, vacation, excuses and other fixed work. When present it replaces the calculated capacity.
 model SprintMemberPlan {
-  id              String @id @default(cuid())
-  sprintId        String
-  memberId        String
+  id              String @id @default(cuid()) @db.NVarChar(36)
+  sprintId        String @db.NVarChar(36)
+  memberId        String @db.NVarChar(36)
   availabilityPct Float  @default(100)
   initialHours    Float
   meetingsHours   Float  @default(0)
@@ -352,8 +326,8 @@ model SprintMemberPlan {
   otherHours      Float  @default(0)
   /// Hours left for story tasks (the sheet's "Final Buffer")
   capacityHours   Float
-  sprint          Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
-  member          Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  sprint          Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  member          Member @relation(fields: [memberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([sprintId, memberId])
   @@index([memberId])
@@ -361,13 +335,13 @@ model SprintMemberPlan {
 
 /// One period in which a sprint was on hold. The sprint is paused from `startDate` up to the day before `resumedOn`.
 model SprintPause {
-  id             String    @id @default(cuid())
-  sprintId       String
-  sprint         Sprint    @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid()) @db.NVarChar(36)
+  sprintId       String    @db.NVarChar(36)
+  sprint         Sprint    @relation(fields: [sprintId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   startDate      DateTime  @db.Date
   /// First day the team works on the sprint again; empty while the sprint is still paused
   resumedOn      DateTime? @db.Date
-  reason         String    @default("")
+  reason         String    @default("") @db.NVarChar(Max)
   /// Working days the end date was moved by when the sprint resumed (0 if it was not extended)
   extendedByDays Int       @default(0)
   createdAt      DateTime  @default(now())

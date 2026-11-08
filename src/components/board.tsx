@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import type { Priority, WorkItemStatus, WorkItemType } from "@prisma/client";
+import type { Priority, WorkItemStatus, WorkItemType } from "@/lib/enums";
 import { setWorkItemStatus } from "@/lib/actions/work-items";
 import { quickAssign } from "@/lib/actions/sprints";
 import { PRIORITY_LABEL, STATUS_LABEL, statusesFor } from "@/lib/work-items";

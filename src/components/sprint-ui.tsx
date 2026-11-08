@@ -1,4 +1,4 @@
-import type { SprintState } from "@prisma/client";
+import type { SprintState } from "@/lib/enums";
 import type { Health } from "@/lib/planning";
 import { cn } from "@/components/ui";
 

@@ -1,15 +1,13 @@
 "use server";
 
-import type { Prisma, WorkItemStatus, WorkItemType } from "@prisma/client";
+import type { WorkItemStatus, WorkItemType } from "@/lib/enums";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, type Tx } from "@/lib/db";
 import { type ActionState, toActionError } from "@/lib/action-state";
 import { PARENT_TYPES, PRIORITIES, TYPES, itemKey, nextRank, statusesFor, TYPE_LABEL, validateParent } from "@/lib/work-items";
-
-type Tx = Prisma.TransactionClient;
 
 const optionalId = z.preprocess((v) => (v === "" || v == null ? null : String(v)), z.string().nullable());
 const hours = z.preprocess(

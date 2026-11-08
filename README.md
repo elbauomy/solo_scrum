@@ -21,36 +21,17 @@ All phases are built. See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for how to us
 | 7. Excel import (the app's template) | ✅ |
 | 8. Sprint planning sheet import (sprint, capacity, user stories, tasks) and manual daily standup status | ✅ |
 
-## Deploying for free (Neon + Vercel)
+## Deploying on ACT servers (Microsoft SQL Server)
 
-The app runs on **Vercel** (Hobby plan). The database is on **Neon** (free plan, London).
-Netlify also works (`netlify.toml` is kept), but `*.netlify.app` addresses are blocked on the owner's networks.
+The app runs on Node.js with a Microsoft SQL Server database. Requirements, settings, build steps, what changed from
+the PostgreSQL version and how to move existing data are in [docs/SQL_SERVER.md](docs/SQL_SERVER.md).
 
-### 1. Database on Neon
-
-In <https://console.neon.tech>, open the project and click **Connect**:
-- The string whose host contains `-pooler` (Neon calls it `DATABASE_URL_POOLED`) is our **`DATABASE_URL`**.
-- The string **without** `-pooler` (Neon calls it `DATABASE_URL`) is our **`DIRECT_URL`**.
-
-### 2. Project on Vercel
-
-1. In <https://vercel.com/new>, sign in with GitHub and import the `act_scrum` repository.
-2. Add these environment variables:
-
-| Key | Value |
-|---|---|
-| `DATABASE_URL` | Neon pooled connection string |
-| `DIRECT_URL` | Neon direct connection string |
-| `APP_PASSWORD` | The owner's password (user name `khaled elbauomy`) |
-| `VIEWER_PASSWORD` | The view-only user's password (user name `remoon milad`). If it is empty, that account cannot sign in |
-| `SESSION_SECRET` | Any random text of at least 32 characters |
-
-The user names are built in and can be changed with the optional `ADMIN_USERNAME` and `VIEWER_USERNAME` settings.
-
-3. Click **Deploy**. `vercel.json` makes each build apply database changes first.
-
-Every merge to `main` redeploys automatically. To change a password, edit `APP_PASSWORD` or `VIEWER_PASSWORD` in
-Vercel → Settings → Environment Variables, then redeploy.
+```bash
+npm ci
+npx prisma migrate deploy
+npm run build
+npm start
+```
 
 ## Running locally (developers)
 

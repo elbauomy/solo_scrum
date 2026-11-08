@@ -11,7 +11,7 @@ export default async function SquadsPage({ searchParams }: PageProps<"/squads">)
   const { q } = (await searchParams) as { q?: string };
   const [squads, settings] = await Promise.all([
     db.squad.findMany({
-      where: q ? { name: { contains: q, mode: "insensitive" } } : undefined,
+      where: q ? { name: { contains: q } } : undefined,
       orderBy: { name: "asc" },
       include: { lobs: { select: { name: true } }, memberships: { include: { member: { select: { active: true } } } } },
     }),

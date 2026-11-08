@@ -1,5 +1,5 @@
 import "server-only";
-import type { Priority, WorkItemStatus, WorkItemType } from "@prisma/client";
+import type { Priority, WorkItemStatus, WorkItemType } from "@/lib/enums";
 import { db } from "./db";
 import { parseDate, addDays } from "./dates";
 import { itemKey, progressPercent, rollup, type RollupNode } from "./work-items";

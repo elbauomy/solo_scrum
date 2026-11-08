@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Tx } from "./db";
 
 export class UserError extends Error {}
 
@@ -7,7 +7,7 @@ export class UserError extends Error {}
  * Its open tasks follow it; tasks that are already Done stay in the sprint where they were finished.
  * Every change is written to the item history.
  */
-export async function moveItemToSprint(tx: Prisma.TransactionClient, itemId: string, sprintId: string | null): Promise<void> {
+export async function moveItemToSprint(tx: Tx, itemId: string, sprintId: string | null): Promise<void> {
   const item = await tx.workItem.findUnique({ where: { id: itemId }, include: { children: { where: { type: "TASK" } } } });
   if (!item) throw new UserError("This item no longer exists.");
   if (item.type !== "STORY" && item.type !== "BUG") throw new UserError("Only user stories and bugs can be planned into a sprint.");

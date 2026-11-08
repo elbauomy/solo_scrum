@@ -5,7 +5,7 @@
 //   header row "Team Member" then one column per member ("Dev (1)<newline>Anna")
 //   capacity   availability %, Initial buffer hours, meetings, vacations (days), excuses, done-definition and special tasks, Final Buffer
 //   stories    a numbered row with the story title, then one row per task type with hours in the member's column
-import type { SprintState } from "@prisma/client";
+import type { SprintState } from "@/lib/enums";
 
 export type Grid = string[][];
 

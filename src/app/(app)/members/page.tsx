@@ -17,7 +17,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
       where: {
         ...(squad ? { memberships: { some: { squadId: squad } } } : {}),
         ...(status === "active" ? { active: true } : status === "inactive" ? { active: false } : {}),
-        ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" as const } }, { role: { contains: q, mode: "insensitive" as const } }] } : {}),
+        ...(q ? { OR: [{ name: { contains: q } }, { role: { contains: q } }] } : {}),
       },
       orderBy: { name: "asc" },
       include: { memberships: { include: { squad: true, lobAllocations: { include: { lob: { select: { key: true } } } } } }, leaves: true },

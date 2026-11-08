@@ -7,7 +7,7 @@ This is the technical reference for the whole project. The agreed product scope 
 
 - **Simple over clever.** One app, one database, one host. No microservices, no queues, no extra paid services.
 - **One user (v1).** The Scrum Master is the only login. Squad members are records, not accounts.
-- **Free hosting.** Vercel (Hobby) + Neon PostgreSQL (free plan) + GitHub. `netlify.toml` is kept as an alternative.
+- **Company hosting.** ACT servers with Microsoft SQL Server (moved from the free Vercel + Neon setup). See [SQL_SERVER.md](./SQL_SERVER.md).
 - **History instead of background jobs.** Every change that affects a report (status, estimate,
   sprint membership, release date) is written to a history table. Reports are calculated from this
   history when you open them, so no daily scheduled job is needed.
@@ -18,7 +18,7 @@ This is the technical reference for the whole project. The agreed product scope 
 |---|---|---|
 | Framework | Next.js 16 (App Router), React 19, TypeScript | Server Components for pages, Server Actions for every create/update/delete |
 | Styling | Tailwind CSS 4 | Small set of in-house UI components in `src/components/ui` |
-| Database | PostgreSQL 16 (Neon in production) | |
+| Database | Microsoft SQL Server 2017+ (tested on 2022) | Fixed values stored as text, see SQL_SERVER.md |
 | ORM / migrations | Prisma 6 | `prisma/schema.prisma`; migrations in `prisma/migrations` |
 | Validation | Zod 4 | Every Server Action validates its input |
 | Auth | Single password + signed session cookie (`jose`, HS256) | No user table |
@@ -78,7 +78,7 @@ src/
 
 ## 4. Data model
 
-Dates without a time (sprint dates, holidays, leave) are stored as PostgreSQL `date` and handled
+Dates without a time (sprint dates, holidays, leave) are stored as SQL Server `date` and handled
 in code as UTC midnight, so time zones never shift a day.
 
 ### Phase 1 (built)
@@ -285,25 +285,26 @@ Hours "burn" only when a task becomes **Done**.
 
 | Variable | Where | Purpose |
 |---|---|---|
-| `DATABASE_URL` | Vercel + local `.env` | Neon **pooled** connection string (used by the app) |
-| `DIRECT_URL` | Vercel + local `.env` | Neon **direct** connection string (used for migrations) |
-| `APP_PASSWORD` | Vercel + local `.env` | Login password |
-| `SESSION_SECRET` | Vercel + local `.env` | Random string of 32+ characters |
+| `DATABASE_URL` | Server + local `.env` | SQL Server connection string (`sqlserver://HOST:1433;database=...;user=...;password=...;encrypt=true`) |
+| `APP_PASSWORD` / `VIEWER_PASSWORD` | Server + local `.env` | Owner and view-only passwords |
+| `SESSION_SECRET` | Server + local `.env` | Random string of 32+ characters |
 
-**Vercel build** (`vercel.json`): `prisma migrate deploy` then `next build`. Database changes are applied
-automatically on each deploy; migrations only add tables and columns. The Prisma engine includes
-`rhel-openssl-3.0.x` for Vercel's Linux. `netlify.toml` is kept as an alternative host.
+**Release on the ACT server**: `npm ci`, `npx prisma migrate deploy`, `npm run build`, `npm start`, behind HTTPS
+(the session cookie is `Secure` in production). Full steps in [SQL_SERVER.md](./SQL_SERVER.md). The database history
+restarts with one SQL Server migration (`20261108120000_init_sql_server`); the earlier PostgreSQL migrations are in git history.
 
-**Branches**: work happens on a feature branch, and `main` is what Vercel publishes.
+**Branches**: work happens on a feature branch, and `main` is what gets deployed.
 
-**Backups**: Neon free has a short restore history, so *Import & Backup* downloads every table as one Excel file.
+**Backups**: *Import & Backup* downloads every table as one Excel file; the database itself is covered by IT's SQL Server backups.
 
 ## 9. Local development
 
 ```bash
-cp .env.example .env      # fill in values
+# a local SQL Server in Docker (then create the database solo_scrum in it)
+docker run -d --name mssql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD='Your_Strong_Pass_1' -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+cp .env.example .env      # fill in values; DATABASE_URL points at the local SQL Server
 npm install
-npx prisma migrate dev    # create tables
+npx prisma migrate deploy # create tables
 npm run dev               # http://localhost:3000
 npm test                  # unit tests (capacity, hierarchy, planning, import)
 ```

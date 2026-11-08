@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { WorkItemStatus } from "@prisma/client";
+import type { WorkItemStatus } from "@/lib/enums";
 import { db } from "@/lib/db";
 import { deleteWorkItem, updateWorkItem } from "@/lib/actions/work-items";
 import {

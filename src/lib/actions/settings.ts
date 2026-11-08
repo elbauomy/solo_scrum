@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { formatWorkingDays } from "@/lib/settings";
 import { parseDate } from "@/lib/dates";
 import { type ActionState, isoDate, requiredName, toActionError } from "@/lib/action-state";
 
@@ -21,8 +22,8 @@ export async function updateSettings(_prev: ActionState, formData: FormData): Pr
       defaultDailyHours: formData.get("defaultDailyHours"),
       defaultSprintLengthDays: formData.get("defaultSprintLengthDays"),
     });
-    data.workingDays = [...new Set(data.workingDays)].sort();
-    await db.setting.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
+    const row = { ...data, workingDays: formatWorkingDays(data.workingDays) };
+    await db.setting.upsert({ where: { id: 1 }, update: row, create: { id: 1, ...row } });
   } catch (err) {
     return toActionError(err);
   }

@@ -1,5 +1,5 @@
 // Daily plan: for each member and each day, which user stories and tasks they work on. Pure logic.
-import type { WorkItemStatus } from "@prisma/client";
+import type { WorkItemStatus } from "@/lib/enums";
 import type { TaskView } from "./analytics";
 import { isWorkingDay, type WorkCalendar } from "./capacity";
 import { toISODate } from "./dates";

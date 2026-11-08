@@ -1,4 +1,4 @@
-import type { Priority, WorkItemStatus, WorkItemType } from "@prisma/client";
+import type { Priority, WorkItemStatus, WorkItemType } from "@/lib/enums";
 import { PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/lib/work-items";
 import { cn } from "@/components/ui";
 

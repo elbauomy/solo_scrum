@@ -129,7 +129,7 @@ export async function closeSprint(_prev: ActionState, formData: FormData): Promi
       });
       // A sprint closed while paused ends its pause today.
       await tx.sprintPause.updateMany({ where: { sprintId: id, resumedOn: null }, data: { resumedOn: todayUTC() } });
-      await tx.sprint.update({ where: { id }, data: { state: "CLOSED", closedAt: new Date(), result } });
+      await tx.sprint.update({ where: { id }, data: { state: "CLOSED", closedAt: new Date(), result: JSON.stringify(result) } });
       for (const item of carried) await moveItemToSprint(tx, item.id, carryTo);
     });
   } catch (err) {
@@ -149,6 +149,8 @@ export async function deleteSprint(_prev: ActionState, formData: FormData): Prom
     await db.$transaction(async (tx) => {
       const items = await tx.workItem.findMany({ where: { sprintId: id, type: { in: ["STORY", "BUG"] } } });
       for (const i of items) await moveItemToSprint(tx, i.id, null);
+      // Done tasks that stayed behind: the database no longer clears this on delete, so the app does.
+      await tx.workItem.updateMany({ where: { sprintId: id }, data: { sprintId: null } });
       await tx.sprint.delete({ where: { id } });
     });
   } catch (err) {
@@ -174,6 +176,7 @@ export async function deleteSprints(_prev: ActionState, formData: FormData): Pro
       for (const sp of deletable) {
         const items = await tx.workItem.findMany({ where: { sprintId: sp.id, type: { in: ["STORY", "BUG"] } }, select: { id: true } });
         for (const i of items) await moveItemToSprint(tx, i.id, null);
+        await tx.workItem.updateMany({ where: { sprintId: sp.id }, data: { sprintId: null } });
         await tx.sprint.delete({ where: { id: sp.id } });
       }
     });

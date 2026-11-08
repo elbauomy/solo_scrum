@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { WorkItemStatus } from "@prisma/client";
+import type { WorkItemStatus } from "@/lib/enums";
 import { setWorkItemStatus } from "@/lib/actions/work-items";
 import { STATUS_LABEL } from "@/lib/work-items";
 import { cn } from "@/components/ui";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { WorkItemType } from "@prisma/client";
+import type { WorkItemType } from "@/lib/enums";
 import { createWorkItem } from "@/lib/actions/work-items";
 import { childTypesOf, PARENT_REQUIRED, PARENT_TYPES, PRIORITIES, PRIORITY_LABEL, TYPES, TYPE_LABEL } from "@/lib/work-items";
 import { ActionForm, SubmitButton } from "@/components/ui/forms";

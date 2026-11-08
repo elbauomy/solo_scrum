@@ -3,11 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, type Tx } from "@/lib/db";
 import { workingDaysBetween } from "@/lib/capacity";
 import { parseDate } from "@/lib/dates";
 import { findPlanningSheet, readGrids } from "@/lib/excel";
-import { getWorkCalendar } from "@/lib/settings";
+import { getSettings, getWorkCalendar } from "@/lib/settings";
 import { parseSprintSheet, planSprintImport, resolveLob, type ImportOps, type MemberRef, type PlanItem } from "@/lib/sprint-sheet";
 import { type ActionState, toActionError } from "@/lib/action-state";
 
@@ -42,7 +42,7 @@ export async function importSprintPlan(_prev: ActionState, formData: FormData): 
     const [lobRows, cal, settings] = await Promise.all([
       db.lineOfBusiness.findMany({ include: { squad: { select: { name: true } } } }),
       getWorkCalendar(),
-      db.setting.findUnique({ where: { id: 1 } }),
+      getSettings(),
     ]);
     const lobs = lobRows.map((l) => ({ id: l.id, name: l.name, key: l.key, squadId: l.squadId, squadName: l.squad.name }));
     const lob = resolveLob(parsed, lobs, lobOverrideId).lob;
@@ -96,7 +96,6 @@ export async function importSprintPlan(_prev: ActionState, formData: FormData): 
   }
 }
 
-type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
 async function applyOps(tx: Tx, ops: ImportOps): Promise<string> {
   // ---- members and squad membership
@@ -106,10 +105,15 @@ async function applyOps(tx: Tx, ops: ImportOps): Promise<string> {
   }
   const memberId = (ref: MemberRef) => ("existingId" in ref ? ref.existingId : newMemberIds[ref.newIndex]);
   if (ops.memberships.length) {
-    await tx.squadMembership.createMany({
-      data: ops.memberships.map((m) => ({ memberId: memberId(m.member), squadId: ops.squadId, weeklyHours: m.weeklyHours })),
-      skipDuplicates: true,
+    // Members already in the squad keep their hours (SQL Server has no "skip duplicates", so they are filtered out first).
+    const wanted = ops.memberships.map((m) => ({ memberId: memberId(m.member), squadId: ops.squadId, weeklyHours: m.weeklyHours }));
+    const existing = await tx.squadMembership.findMany({
+      where: { squadId: ops.squadId, memberId: { in: wanted.map((w) => w.memberId) } },
+      select: { memberId: true },
     });
+    const have = new Set(existing.map((e) => e.memberId));
+    const fresh = wanted.filter((w, i) => !have.has(w.memberId) && wanted.findIndex((x) => x.memberId === w.memberId) === i);
+    if (fresh.length) await tx.squadMembership.createMany({ data: fresh });
   }
 
   // ---- sprint

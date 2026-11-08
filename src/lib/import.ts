@@ -1,5 +1,5 @@
 // Excel import: template and validation. Pure logic, no database access.
-import type { Priority, WorkItemType } from "@prisma/client";
+import type { Priority, WorkItemType } from "@/lib/enums";
 import type { Sheet } from "./excel";
 import { LOB_KEY_PATTERN, PARENT_TYPES, TYPES, TYPE_LABEL, validateParent } from "./work-items";
 

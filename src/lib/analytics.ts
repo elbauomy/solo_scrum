@@ -1,5 +1,5 @@
 import "server-only";
-import type { SprintState, WorkItemStatus, WorkItemType } from "@prisma/client";
+import type { SprintState, WorkItemStatus, WorkItemType } from "@/lib/enums";
 import { db } from "./db";
 import { getSettings } from "./settings";
 import { addDays, toISODate, todayUTC } from "./dates";
@@ -376,7 +376,7 @@ export async function loadAnalytics(opts: { asClosed?: string } = {}): Promise<A
         };
       }),
     };
-    const stored = s.state === "CLOSED" && s.id !== opts.asClosed ? (s.result as SprintSummary | null) : null;
+    const stored = s.state === "CLOSED" && s.id !== opts.asClosed ? readStoredSummary(s.result) : null;
     if (stored) {
       (velocity[lob.id] ??= []).push({ sprintId: s.id, doneHours: stored.doneHours, lengthDays });
       return { ...view, summary: stored };
@@ -517,4 +517,14 @@ export function sprintLengthFor(a: Analytics, lobId: string): number {
 /** The last three closed sprints of a LOB, newest last. */
 export function recentVelocity(a: Analytics, lobId: string, n = 3): VelocityPoint[] {
   return (a.velocity[lobId] ?? []).slice(-n);
+}
+
+/** A closed sprint's saved results are stored as JSON text. */
+function readStoredSummary(value: string | null): SprintSummary | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as SprintSummary;
+  } catch {
+    return null;
+  }
 }
