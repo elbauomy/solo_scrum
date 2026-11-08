@@ -294,7 +294,7 @@ Hours "burn" only when a task becomes **Done**.
 automatically on each deploy; migrations only add tables and columns. The Prisma engine includes
 `rhel-openssl-3.0.x` for Vercel's Linux. `netlify.toml` is kept as an alternative host.
 
-**Branches**: work happens on a feature branch, and `main` is what Vercel publishes.
+**Branches**: work happens on a feature branch with two pull requests, one into `main` (PostgreSQL, published by Vercel) and one into `act-sqlserver` (SQL Server, deployed to ACT servers). See "Two versions" in the README.
 
 **Backups**: Neon free has a short restore history, so *Import & Backup* downloads every table as one Excel file.
 
