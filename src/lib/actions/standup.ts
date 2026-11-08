@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDate } from "@/lib/dates";
 import { isStandupLeave, offNote } from "@/lib/standup";
@@ -25,7 +25,7 @@ const schema = z.object({
  * Unmarking removes the leave that the standup added. A day with no status, no blockers and not off removes the note.
  */
 export async function saveStandup(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("standup.edit");
   try {
     const d = schema.parse(Object.fromEntries(formData.entries()));
     const date = parseDate(d.date);

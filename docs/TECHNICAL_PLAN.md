@@ -269,15 +269,26 @@ Hours "burn" only when a task becomes **Done**.
 
 ## 7. Security
 
-- `APP_PASSWORD` (owner), `VIEWER_PASSWORD` (view-only user) and `SESSION_SECRET` (signs the session cookie) live only in the
-  hosting provider's environment variables, never in the code. User names default to `khaled elbauomy` and `remoon milad` (`ADMIN_USERNAME`, `VIEWER_USERNAME`).
-- Two roles (`credentials.ts`): **admin** and **viewer**. The session cookie carries the role and name, signed with HS256, so it cannot be changed in the browser.
-  Login compares the typed password with the account's password in constant time and gives the same message for an unknown user and a wrong password.
-- `requireSession()` lets any signed-in user view pages and download exports; `requireAuth()` (called first in every Server Action and import) lets only the admin through and throws `ForbiddenError` for the viewer.
-  The screens follow: `RoleProvider` makes shared forms, buttons, selects, drag and drop and bulk bars read-only, and `EditOnly` hides create, delete and import sections for the viewer.
-  The server check is the real protection; hiding is only convenience.
+- **Users, roles and permissions** (`User`, `Role`, `RolePermission`). Each user has one role; a role is a list of permission keys from
+  `permissions.ts` (one group per page or feature, each with View and change permissions). The built-in **Administrator** role
+  (`Role.builtIn`) has every permission and cannot be edited or deleted; the app always keeps one active administrator.
+- **Passwords** are hashed with scrypt (`passwords.ts`, N=16384, r=8, p=1, 16-byte salt). Rules: 10–200 characters, not the user name.
+  Unknown users are checked against a dummy hash so timing does not reveal user names; every failure gives the same message after a delay.
+  An administrator sets a temporary password (`mustChangePassword`): until the user picks their own, only the profile page opens.
+- **Sessions**: the cookie holds only the user id and `sessionVersion`, signed with HS256 (`SESSION_SECRET`). On every request
+  `getCurrentUser()` reads the user and role from the database, so role changes apply at once and a disabled user is signed out.
+  Changing or resetting a password raises `sessionVersion`, which ends every other session of that user.
+- **Checks**: every Server Action starts with `requirePermission(...)`; every page with `requirePageAccess(...)` (redirects to the first
+  page the role may open); every download checks the permission of its page. Screens follow with `RoleProvider` (read-only sections),
+  `Can` (show a part only with a permission) and `useCan`. The server check is the real protection; hiding is only convenience.
+- **First sign-in after the update**: when the user table is empty, `APP_PASSWORD` / `VIEWER_PASSWORD` become the first two users
+  (Administrator and Viewer). After that those settings are not used.
+- **Microsoft sign-in** (`sso.ts`, optional): OpenID Connect authorization code flow with PKCE against Microsoft Entra ID (single tenant).
+  State, nonce and the PKCE verifier travel in a signed 10-minute cookie; the ID token is verified against Microsoft's published keys,
+  issuer, audience, tenant and nonce. The account is matched to an active user by email; there is no automatic account creation.
+  A temporary password is removed when its user signs in with Microsoft.
 - Session cookie: `httpOnly`, `secure`, `sameSite=lax`, lasts 30 days.
-- `proxy.ts` sends anyone not signed in to `/login`. Every Server Action and every export route calls `requireAuth()`.
+- `proxy.ts` sends anyone without a valid session cookie to `/login` (the Microsoft sign-in routes are open).
 - All database access goes through Prisma (no hand-built SQL), and all input is validated with Zod.
 - Uploaded Excel files are limited to 2 MB and 1,000 rows, are only read (never executed), and nothing is imported if any row is invalid.
 
@@ -287,7 +298,8 @@ Hours "burn" only when a task becomes **Done**.
 |---|---|---|
 | `DATABASE_URL` | Vercel + local `.env` | Neon **pooled** connection string (used by the app) |
 | `DIRECT_URL` | Vercel + local `.env` | Neon **direct** connection string (used for migrations) |
-| `APP_PASSWORD` | Vercel + local `.env` | Login password |
+| `APP_PASSWORD` / `VIEWER_PASSWORD` | Vercel + local `.env` | First passwords of the two original accounts (used once) |
+| `MS_ENTRA_TENANT_ID` / `MS_ENTRA_CLIENT_ID` / `MS_ENTRA_CLIENT_SECRET` / `APP_URL` | Vercel (optional) | Sign in with Microsoft |
 | `SESSION_SECRET` | Vercel + local `.env` | Random string of 32+ characters |
 
 **Vercel build** (`vercel.json`): `prisma migrate deploy` then `next build`. Database changes are applied

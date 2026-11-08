@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { loadAnalytics } from "@/lib/analytics";
 import { getWorkCalendar } from "@/lib/settings";
@@ -13,6 +14,7 @@ import { Badge, Card, Empty, PageHeader, Stat, Table, Td, Th } from "@/component
 type Q = { squad?: string; lob?: string; sprint?: string; release?: string; from?: string; to?: string };
 
 export default async function DashboardPage({ searchParams }: PageProps<"/">) {
+  await requirePageAccess("dashboard.view");
   const f = (await searchParams) as Q;
   const [a, cal, blockedRows, squadRows] = await Promise.all([
     loadAnalytics(),

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { loadDailyPlan, DAY_OPTIONS, type DailyFilters } from "@/lib/daily-plan-data";
 import type { DayCell, DayItem } from "@/lib/daily-plan";
 import { addDays, formatDate, startOfWeek, toISODate, WEEKDAYS_SHORT } from "@/lib/dates";
@@ -60,6 +62,7 @@ function Cell({ c, isToday }: { c: DayCell; isToday: boolean }) {
 }
 
 export default async function DailyPlanPage({ searchParams }: PageProps<"/timeline/daily">) {
+  const me = await requirePageAccess("timeline.view");
   const f = (await searchParams) as DailyFilters;
   const { a, from, n, days, rows, pausedSprints } = await loadDailyPlan(f);
   const todayISO = toISODate(a.today);
@@ -73,6 +76,7 @@ export default async function DailyPlanPage({ searchParams }: PageProps<"/timeli
   ];
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("timeline.act")}>
     <>
       <PageHeader
         title="Timeline"
@@ -168,5 +172,6 @@ export default async function DailyPlanPage({ searchParams }: PageProps<"/timeli
         </p>
       </Card>
     </>
+    </RoleProvider>
   );
 }

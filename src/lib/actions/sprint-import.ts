@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workingDaysBetween } from "@/lib/capacity";
 import { parseDate } from "@/lib/dates";
@@ -18,7 +18,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
  * mode "check": show what would happen. mode "import": create or update the sprint, its members' capacity, stories and tasks.
  */
 export async function importSprintPlan(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.import");
   try {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) return { error: "Please choose your sprint planning file (.xlsx or .csv)." };

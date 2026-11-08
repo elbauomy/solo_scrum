@@ -54,16 +54,17 @@ In <https://console.neon.tech>, open the project and click **Connect**:
 |---|---|
 | `DATABASE_URL` | Neon pooled connection string |
 | `DIRECT_URL` | Neon direct connection string |
-| `APP_PASSWORD` | The owner's password (user name `khaled elbauomy`) |
-| `VIEWER_PASSWORD` | The view-only user's password (user name `remoon milad`). If it is empty, that account cannot sign in |
+| `APP_PASSWORD` | Used once: the owner's password for the very first sign-in (user name `khaled elbauomy`) |
+| `VIEWER_PASSWORD` | Used once: the view-only user's first password (user name `remoon milad`) |
 | `SESSION_SECRET` | Any random text of at least 32 characters |
+| `MS_ENTRA_TENANT_ID`, `MS_ENTRA_CLIENT_ID`, `MS_ENTRA_CLIENT_SECRET`, `APP_URL` | Optional: "Sign in with Microsoft" (see the user guide) |
 
-The user names are built in and can be changed with the optional `ADMIN_USERNAME` and `VIEWER_USERNAME` settings.
+The first sign-in on an empty database turns the two accounts above into users (Administrator and Viewer). After that,
+users, roles and passwords are managed in the app (**Users**, **Roles & Permissions**, and each person's **profile**).
 
 3. Click **Deploy**. `vercel.json` makes each build apply database changes first.
 
-Every merge to `main` redeploys automatically. To change a password, edit `APP_PASSWORD` or `VIEWER_PASSWORD` in
-Vercel → Settings → Environment Variables, then redeploy.
+Every merge to `main` redeploys automatically. Passwords are changed in the app (profile page), not in Vercel.
 
 ## Running locally (developers)
 

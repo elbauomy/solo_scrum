@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { db } from "@/lib/db";
 import { loadAnalytics } from "@/lib/analytics";
 import { applyCls, selectCls } from "@/lib/filters";
@@ -10,6 +12,7 @@ import { Card, Empty, PageHeader } from "@/components/ui";
 type Q = { squad?: string; lob?: string; sprint?: string; assignee?: string; parentType?: string; scope?: string; blocked?: string; q?: string; level?: string; group?: string };
 
 export default async function BoardPage({ searchParams }: PageProps<"/board">) {
+  const me = await requirePageAccess("board.view");
   const f = (await searchParams) as Q;
   const a = await loadAnalytics();
   const level = f.level === "stories" ? "stories" : "tasks";
@@ -152,6 +155,7 @@ export default async function BoardPage({ searchParams }: PageProps<"/board">) {
 
   const sum = sprint.summary;
   return (
+    <RoleProvider readOnly={!me.permissions.has("board.move")}>
     <>
       <PageHeader
         title="Sprint Board"
@@ -195,5 +199,6 @@ export default async function BoardPage({ searchParams }: PageProps<"/board">) {
         <Board key={`${sprint.id}-${level}-${group}-${cards.map((c) => c.id + c.status + (c.assigneeId ?? "")).join()}`} cards={cards} columns={columns} group={group} />
       )}
     </>
+    </RoleProvider>
   );
 }

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess, can } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { loadAnalytics } from "@/lib/analytics";
@@ -13,16 +15,17 @@ import { SprintButton } from "@/components/item-actions";
 import { HealthBadge, HealthParts, LoadBar, SprintStateBadge, fmtH, healthText } from "@/components/sprint-ui";
 import { StatusBadge, TypeBadge } from "@/components/work-items/badges";
 import { Badge, Card, Empty, Field, Input, LinkButton, PageHeader, Select, Stat, Table, Td, Textarea, Th } from "@/components/ui";
-import { EditOnly, canEdit } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 export default async function SprintPage({ params, searchParams }: PageProps<"/sprints/[id]">) {
+  const me = await requirePageAccess("sprints.view");
   const { id } = await params;
   const { q } = (await searchParams) as { q?: string };
   const a = await loadAnalytics();
   const s = a.sprints.find((x) => x.id === id);
   if (!s) notFound();
   const sum = s.summary;
-  const edit = await canEdit();
+  const edit = await can("sprints.manage");
   const editable = s.state !== "CLOSED" && edit;
 
   const lob = await db.lineOfBusiness.findUniqueOrThrow({ where: { id: s.lobId } });
@@ -74,6 +77,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
   const loadPct = sum.totalCapacity > 0 ? Math.round((sum.currentHours / sum.totalCapacity) * 100) : null;
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("sprints.manage")}>
     <>
       <PageHeader
         title={s.name}
@@ -144,7 +148,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
           </Card>
 
           {editable && (
-            <EditOnly>
+            <Can perm="sprints.manage">
             <Card
               title={`Add from backlog (${candidates.length})`}
               actions={
@@ -187,7 +191,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
                 </Table>
               )}
             </Card>
-            </EditOnly>
+            </Can>
           )}
         </div>
 
@@ -199,7 +203,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
             </Card>
           )}
 
-          <EditOnly>
+          <Can perm="sprints.run">
           <Card title="Sprint status">
             {s.state === "PLANNED" && (
               <ActionForm action={startSprint} resetOnSuccess={false}>
@@ -263,7 +267,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
               </div>
             )}
           </Card>
-          </EditOnly>
+          </Can>
           {s.state === "CLOSED" && !edit && (
             <Card title="Sprint status">
               <p className="text-sm text-slate-600">
@@ -272,7 +276,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
             </Card>
           )}
 
-          <EditOnly>
+          <Can perm="sprints.manage">
           <div id="edit" className="scroll-mt-4">
             <Card title="Edit sprint">
               <ActionForm action={updateSprint} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
@@ -298,7 +302,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
               </ActionForm>
             </Card>
           </div>
-          </EditOnly>
+          </Can>
 
           {s.pauses.length > 0 && (
             <Card title={`Pauses (${s.pauses.length})`}>
@@ -384,5 +388,6 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
         </div>
       </Card>
     </>
+    </RoleProvider>
   );
 }

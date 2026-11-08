@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { notFound } from "next/navigation";
 import { loadAnalytics } from "@/lib/analytics";
 import { deleteRelease, setDeployed, updateRelease } from "@/lib/actions/releases";
@@ -8,9 +10,10 @@ import { ReleaseSelect } from "@/components/item-actions";
 import { ReleaseStatus } from "@/components/release-status";
 import { HealthBadge, SprintStateBadge, fmtH } from "@/components/sprint-ui";
 import { Card, Empty, Field, Input, LinkButton, PageHeader, Stat, Table, Td, Textarea, Th } from "@/components/ui";
-import { EditOnly } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 export default async function ReleasePage({ params }: PageProps<"/releases/[id]">) {
+  const me = await requirePageAccess("releases.view");
   const { id } = await params;
   const a = await loadAnalytics();
   const r = a.releases.find((x) => x.id === id);
@@ -21,6 +24,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
   const releaseOptions = [{ id: r.id, name: r.name }];
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("releases.manage")}>
     <>
       <PageHeader
         title={`${r.name}${r.version ? ` · v${r.version}` : ""}`}
@@ -60,7 +64,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
               </Table>
             )}
             {free.length > 0 && (
-              <EditOnly>
+              <Can perm="releases.manage">
               <div className="mt-4 border-t border-slate-200 pt-3">
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Add a sprint</h3>
                 <ul className="space-y-2">
@@ -72,7 +76,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
                   ))}
                 </ul>
               </div>
-              </EditOnly>
+              </Can>
             )}
           </Card>
 
@@ -126,14 +130,15 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
             </ActionForm>
           </Card>
 
-          <EditOnly>
+          <Can perm="releases.manage">
           <Card title="Delete">
             <p className="mb-3 text-sm text-slate-500">Its sprints are kept and become unassigned.</p>
             <DeleteButton action={deleteRelease} id={r.id} label="Delete release" confirmText={`Delete release "${r.name}"?`} />
           </Card>
-          </EditOnly>
+          </Can>
         </div>
       </div>
     </>
+    </RoleProvider>
   );
 }

@@ -22,6 +22,8 @@ const ICONS = {
   reports: (<><path d="M4 20h16" /><rect x="5.5" y="11" width="3.5" height="7" rx="1" /><rect x="10.5" y="6" width="3.5" height="12" rx="1" /><rect x="15.5" y="9" width="3.5" height="9" rx="1" /></>),
   settings: (<><path d="M4 8h9M17 8h3M4 16h3M11 16h9" /><circle cx="15" cy="8" r="2" /><circle cx="9" cy="16" r="2" /></>),
   data: (<><path d="M12 4v10m0 0l-3.5-3.5M12 14l3.5-3.5" /><path d="M4.5 15.5v2A2.5 2.5 0 007 20h10a2.5 2.5 0 002.5-2.5v-2" /></>),
+  users: (<><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19c.5-3 2.7-4.8 5.5-4.8 1.3 0 2.5.4 3.4 1.1" /><circle cx="17.5" cy="16.5" r="3" /><path d="M17.5 15v1.5l1 .8" /></>),
+  roles: (<><path d="M12 3.5l7 3v5c0 4.2-3 7.6-7 9-4-1.4-7-4.8-7-9v-5l7-3z" /><path d="M9 12l2 2 4-4" /></>),
 } satisfies Record<string, ReactNode>;
 
 const sections: { title: string; items: NavItem[] }[] = [
@@ -53,13 +55,24 @@ const sections: { title: string; items: NavItem[] }[] = [
       { href: "/data", label: "Import & Backup", icon: "data" },
     ],
   },
+  {
+    title: "Administration",
+    items: [
+      { href: "/users", label: "Users", icon: "users" },
+      { href: "/roles", label: "Roles & Permissions", icon: "roles" },
+    ],
+  },
 ];
 
-export function Nav() {
+/** The menu. `allowed` lists the pages this user's role may open; the others are not shown. */
+export function Nav({ allowed }: { allowed: string[] }) {
   const pathname = usePathname();
+  const visible = sections
+    .map((section) => ({ ...section, items: section.items.filter((i) => allowed.includes(i.href)) }))
+    .filter((section) => section.items.length > 0);
   return (
     <nav aria-label="Main" className="space-y-6">
-      {sections.map((section) => (
+      {visible.map((section) => (
         <div key={section.title}>
           <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{section.title}</div>
           <ul className="space-y-0.5">

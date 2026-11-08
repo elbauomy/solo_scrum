@@ -80,6 +80,8 @@ model Member {
   sprintShares SprintMemberShare[]
   sprintPlans  SprintMemberPlan[]
   standups     StandupEntry[]
+  /// The sign-in account of this member, if they have one
+  user         User?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 }
@@ -373,4 +375,54 @@ model SprintPause {
   createdAt      DateTime  @default(now())
 
   @@index([sprintId, startDate])
+}
+
+/// Someone who can sign in. Usually linked to a member, but it does not have to be (for example an IT administrator).
+model User {
+  id                 String    @id @default(cuid())
+  /// Lower-case, single spaces: what people type to sign in (for example "khaled elbauomy")
+  username           String    @unique
+  /// Shown in the app, for example "Khaled Elbauomy"
+  displayName        String
+  /// Lower-case. Used to match a Microsoft account (single sign-on). Optional.
+  email              String?   @unique
+  /// scrypt hash (see src/lib/passwords.ts). Empty for accounts that only sign in with Microsoft.
+  passwordHash       String?
+  /// Set when an administrator gives a temporary password: the user must choose their own first
+  mustChangePassword Boolean   @default(false)
+  active             Boolean   @default(true)
+  roleId             String
+  role               Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  memberId           String?   @unique
+  member             Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  /// Raised when the password changes or is reset, so every other open session ends
+  sessionVersion     Int       @default(1)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([roleId])
+}
+
+/// A named set of permissions. Each user has exactly one role.
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String           @default("")
+  /// The Administrator role: has every permission and cannot be changed or deleted
+  builtIn     Boolean          @default(false)
+  permissions RolePermission[]
+  users       User[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+/// One permission of a role, for example "sprints.manage" (the list is in src/lib/permissions.ts).
+model RolePermission {
+  id         String @id @default(cuid())
+  roleId     String
+  permission String
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
 }
