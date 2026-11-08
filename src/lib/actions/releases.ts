@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDate, toISODate } from "@/lib/dates";
 import { UserError } from "@/lib/sprint-ops";
@@ -23,7 +23,7 @@ const releaseSchema = z.object({
 });
 
 export async function createRelease(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("releases.manage");
   let id = "";
   try {
     const lobId = z.string().min(1, "Please choose a line of business").parse(formData.get("lobId"));
@@ -39,7 +39,7 @@ export async function createRelease(_prev: ActionState, formData: FormData): Pro
 
 /** Edits a release. If the target date changes, the old and new dates are logged with the reason. */
 export async function updateRelease(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("releases.manage");
   try {
     const id = String(formData.get("id"));
     const d = releaseSchema.parse(Object.fromEntries(formData.entries()));
@@ -62,7 +62,7 @@ export async function updateRelease(_prev: ActionState, formData: FormData): Pro
 
 /** Record the real deployment date (empty clears it). */
 export async function setDeployed(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("releases.manage");
   try {
     const id = String(formData.get("id"));
     const raw = String(formData.get("deployedDate") ?? "");
@@ -75,7 +75,7 @@ export async function setDeployed(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function deleteRelease(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("releases.manage");
   try {
     await db.release.delete({ where: { id: String(formData.get("id")) } });
   } catch (err) {
@@ -87,7 +87,7 @@ export async function deleteRelease(_prev: ActionState, formData: FormData): Pro
 
 /** Put a sprint into a release (or remove it with releaseId = null). */
 export async function setSprintRelease(sprintId: string, releaseId: string | null): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("releases.manage", "sprints.manage");
   try {
     const sprint = await db.sprint.findUnique({ where: { id: sprintId } });
     if (!sprint) return { error: "This sprint no longer exists." };

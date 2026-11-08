@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { type ActionState, formObject, optionalInt, optionalText, requiredName, toActionError } from "@/lib/action-state";
 import { LOB_KEY_PATTERN, normalizeLobKey } from "@/lib/work-items";
@@ -26,7 +26,7 @@ function friendly(err: unknown): ActionState {
 }
 
 export async function createLob(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("lobs.manage");
   try {
     await db.lineOfBusiness.create({ data: lobSchema.parse(formObject(formData)) });
   } catch (err) {
@@ -37,7 +37,7 @@ export async function createLob(_prev: ActionState, formData: FormData): Promise
 }
 
 export async function updateLob(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("lobs.manage");
   try {
     const id = String(formData.get("id"));
     const data = lobSchema.parse(formObject(formData));
@@ -56,7 +56,7 @@ export async function updateLob(_prev: ActionState, formData: FormData): Promise
 }
 
 export async function deleteLob(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("lobs.manage");
   try {
     const id = String(formData.get("id"));
     const items = await db.workItem.count({ where: { lobId: id } });

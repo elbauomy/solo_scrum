@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { readFirstSheet } from "@/lib/excel";
 import { IMPORT_COLUMNS, planImport, type ImportContext } from "@/lib/import";
@@ -13,7 +13,7 @@ const MAX_ROWS = 1000;
 
 /** Check an Excel file (mode "check") or import it (mode "import"). Nothing is imported if any row has an error. */
 export async function importItems(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("data.import");
   try {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) return { error: "Please choose an Excel (.xlsx) file." };

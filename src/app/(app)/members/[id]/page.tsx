@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSettings, getWorkCalendar } from "@/lib/settings";
@@ -15,11 +17,12 @@ import {
 import { ActionForm, DeleteButton, SubmitButton } from "@/components/ui/forms";
 import { LobSplitForm } from "@/components/lob-split-form";
 import { Badge, Card, Empty, Field, Input, LinkButton, PageHeader, Select, Table, Td, Th } from "@/components/ui";
-import { EditOnly } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 const WEEKS_AHEAD = 4;
 
 export default async function MemberPage({ params }: PageProps<"/members/[id]">) {
+  const me = await requirePageAccess("members.view");
   const { id } = await params;
   const [member, squads, settings, cal] = await Promise.all([
     db.member.findUnique({
@@ -27,6 +30,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
       include: {
         memberships: { include: { squad: { include: { lobs: { orderBy: { name: "asc" } } } }, lobAllocations: true }, orderBy: { squad: { name: "asc" } } },
         leaves: { orderBy: { startDate: "desc" } },
+        user: { select: { id: true, username: true, active: true, role: { select: { name: true } } } },
       },
     }),
     db.squad.findMany({ orderBy: { name: "asc" } }),
@@ -44,6 +48,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
   const suggestedWeekly = settings.defaultDailyHours * settings.workingDays.length;
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("members.manage")}>
     <>
       <PageHeader
         title={member.name}
@@ -78,7 +83,23 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
             </div>
           </Card>
 
-          <EditOnly>
+          {me.permissions.has("users.manage") && (
+            <Card title="Sign-in access">
+              {member.user ? (
+                <p className="text-sm text-slate-600">
+                  Signs in as <span className="font-mono text-xs">{member.user.username}</span> with the role <strong>{member.user.role.name}</strong>
+                  {!member.user.active && " (disabled)"}. <Link href={`/users/${member.user.id}`} className="font-medium text-orange-700 hover:underline">Manage account</Link>
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-600">{member.name} cannot sign in yet.</p>
+                  <LinkButton href={`/users?member=${member.id}`} variant="primary">Give sign-in access</LinkButton>
+                </div>
+              )}
+            </Card>
+          )}
+
+          <Can perm="members.manage">
           <Card title="Add leave">
             <ActionForm action={addLeave} className="space-y-3" successMessage="Leave added.">
               <input type="hidden" name="memberId" value={member.id} />
@@ -96,7 +117,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
               <SubmitButton>Add leave</SubmitButton>
             </ActionForm>
           </Card>
-          </EditOnly>
+          </Can>
         </div>
 
         <div className="space-y-6">
@@ -135,7 +156,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
               </Table>
             )}
             {available.length > 0 && (
-              <EditOnly>
+              <Can perm="members.manage">
               <ActionForm action={saveMembership} className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
                 <input type="hidden" name="memberId" value={member.id} />
                 <Field label="Add to squad">
@@ -151,7 +172,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
                 </Field>
                 <SubmitButton>Add</SubmitButton>
               </ActionForm>
-              </EditOnly>
+              </Can>
             )}
           </Card>
 
@@ -243,5 +264,6 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
         </div>
       </div>
     </>
+    </RoleProvider>
   );
 }

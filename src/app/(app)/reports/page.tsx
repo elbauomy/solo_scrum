@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
 import { REPORTS, buildReports, type ReportFilters } from "@/lib/reports";
 import { applyCls, selectCls, toQuery } from "@/lib/filters";
 import { formatDate } from "@/lib/dates";
@@ -10,6 +11,8 @@ import { Card, Empty, PageHeader, tabClass } from "@/components/ui";
 type Q = ReportFilters & { report?: string };
 
 export default async function ReportsPage({ searchParams }: PageProps<"/reports">) {
+  const me = await requirePageAccess("reports.view");
+  const canExport = me.permissions.has("reports.export");
   const f = (await searchParams) as Q;
   const report = REPORTS.some((r) => r.id === f.report) ? f.report! : "health";
   const b = await buildReports(f);
@@ -32,8 +35,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         description={`${b.sprints.length} sprint(s) included${scope ? ` · ${scope}` : ""} · generated ${formatDate(a.today)}`}
         actions={
           <div className="no-print flex flex-wrap gap-2">
-            <a href={`/api/export/report${query({ report })}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Export this report (Excel)</a>
-            <a href={`/api/export/report${query({ report: "all" })}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Export all (Excel)</a>
+            {canExport && <a href={`/api/export/report${query({ report })}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Export this report (Excel)</a>}
+            {canExport && <a href={`/api/export/report${query({ report: "all" })}`} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Export all (Excel)</a>}
             <PrintButton />
           </div>
         }

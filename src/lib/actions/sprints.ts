@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { addDays, parseDate, toISODate, todayUTC } from "@/lib/dates";
 import { addWorkingDays, workingDaysBetween } from "@/lib/capacity";
@@ -38,7 +38,7 @@ async function checkRelease(lobId: string, releaseId: string | null) {
 }
 
 export async function createSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.manage");
   let id = "";
   try {
     const lobId = z.string().min(1, "Please choose a line of business").parse(formData.get("lobId"));
@@ -56,7 +56,7 @@ export async function createSprint(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function updateSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.manage");
   try {
     const id = String(formData.get("id"));
     const data = sprintSchema.parse(Object.fromEntries(formData.entries()));
@@ -78,7 +78,7 @@ export async function updateSprint(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function startSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.run");
   try {
     const id = String(formData.get("id"));
     await db.$transaction(async (tx) => {
@@ -101,7 +101,7 @@ export async function startSprint(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function closeSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.run");
   try {
     const id = String(formData.get("id"));
     const carryTo = optionalId.parse(formData.get("carryTo"));
@@ -140,7 +140,7 @@ export async function closeSprint(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function deleteSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.manage");
   try {
     const id = String(formData.get("id"));
     const sprint = await db.sprint.findUnique({ where: { id }, include: { _count: { select: { items: true } } } });
@@ -163,7 +163,7 @@ export async function deleteSprint(_prev: ActionState, formData: FormData): Prom
  * Items in a deleted sprint go back to the backlog.
  */
 export async function deleteSprints(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.manage");
   try {
     const ids = formData.getAll("id").map(String).filter(Boolean);
     if (ids.length === 0) return { error: "Tick at least one sprint first." };
@@ -193,7 +193,7 @@ export async function deleteSprints(_prev: ActionState, formData: FormData): Pro
 
 /** Plan a story/bug into a sprint, or take it out (sprintId = null). */
 export async function setItemSprint(itemId: string, sprintId: string | null): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.manage");
   try {
     await db.$transaction((tx) => moveItemToSprint(tx, itemId, sprintId));
   } catch (err) {
@@ -205,7 +205,7 @@ export async function setItemSprint(itemId: string, sprintId: string | null): Pr
 
 /** Move a story/bug to the next planned sprint of its line of business. */
 export async function moveToNextSprint(itemId: string): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("timeline.act", "sprints.manage");
   try {
     await db.$transaction(async (tx) => {
       const item = await tx.workItem.findUnique({ where: { id: itemId }, include: { parent: true } });
@@ -238,7 +238,7 @@ const shareSchema = z.object({
 
 /** Override how much of a member's hours this sprint gets while sprints overlap. Empty = even split. */
 export async function saveSprintShare(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.manage");
   try {
     const d = shareSchema.parse(Object.fromEntries(formData.entries()));
     if (d.percent == null) {
@@ -259,7 +259,7 @@ export async function saveSprintShare(_prev: ActionState, formData: FormData): P
 
 /** Accept the current planned dates of tasks as their new baseline. Dates are recalculated here, never trusted from the browser. */
 export async function acceptBaseline(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("timeline.act", "sprints.manage");
   try {
     const ids = formData.getAll("taskId").map(String).filter(Boolean);
     if (ids.length === 0) return { error: "Nothing to accept." };
@@ -280,7 +280,7 @@ export async function acceptBaseline(_prev: ActionState, formData: FormData): Pr
 }
 
 export async function resetBaseline(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("timeline.act", "sprints.manage");
   try {
     await db.taskBaseline.deleteMany({ where: { workItemId: String(formData.get("id")) } });
   } catch (err) {
@@ -292,7 +292,7 @@ export async function resetBaseline(_prev: ActionState, formData: FormData): Pro
 
 /** Change the assignee of a task from the timeline or board. */
 export async function quickAssign(taskId: string, memberId: string | null): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("timeline.act", "sprints.manage", "backlog.edit");
   try {
     await db.$transaction(async (tx) => {
       const task = await tx.workItem.findUnique({ where: { id: taskId }, include: { lob: true } });
@@ -314,7 +314,7 @@ export async function quickAssign(taskId: string, memberId: string | null): Prom
 
 /** Change a task's hour estimate (used from the timeline's re-estimate action). */
 export async function quickEstimate(taskId: string, hours: number | null): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("timeline.act", "sprints.manage", "backlog.edit");
   try {
     const h = z.number().min(0).max(1000).nullable().parse(hours);
     const task = await db.workItem.findUnique({ where: { id: taskId } });
@@ -339,7 +339,7 @@ const pauseSchema = z.object({
 
 /** Put an active sprint on hold from a date (today or earlier). Its tasks are not scheduled and it takes no share of anyone's hours until it resumes. */
 export async function pauseSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.run");
   try {
     const d = pauseSchema.parse({ id: formData.get("id"), date: formData.get("date"), reason: formData.get("reason") ?? "" });
     await db.$transaction(async (tx) => {
@@ -363,7 +363,7 @@ export async function pauseSprint(_prev: ActionState, formData: FormData): Promi
 
 /** Resume a paused sprint. With "extend" the end date moves out by the working days it was paused, so the team keeps its full time. */
 export async function resumeSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("sprints.run");
   try {
     const d = pauseSchema.omit({ reason: true }).parse({ id: formData.get("id"), date: formData.get("date") });
     const extend = formData.get("extend") === "on";

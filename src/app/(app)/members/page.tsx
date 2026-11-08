@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess, can } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { todayUTC } from "@/lib/dates";
@@ -7,10 +9,11 @@ import { BulkDeleteBar } from "@/components/bulk-delete";
 import { DeleteButton } from "@/components/ui/forms";
 import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { Badge, Card, Empty, Field, Input, PageHeader, Select, Table, Td, Th } from "@/components/ui";
-import { EditOnly, canEdit } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 export default async function MembersPage({ searchParams }: PageProps<"/members">) {
-  const edit = await canEdit();
+  const me = await requirePageAccess("members.view");
+  const edit = await can("members.manage");
   const { squad, status = "active", q } = (await searchParams) as { squad?: string; status?: string; q?: string };
   const [members, squads, settings] = await Promise.all([
     db.member.findMany({
@@ -29,6 +32,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
   const suggestedWeekly = settings.defaultDailyHours * settings.workingDays.length;
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("members.manage")}>
     <>
       <PageHeader title="Members" description="Squad members are names only — they do not log in. A member can work in several squads." />
 
@@ -105,7 +109,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
           )}
         </Card>
 
-        <EditOnly>
+        <Can perm="members.manage">
         <Card title="Add member">
           <ActionForm action={createMember} className="space-y-3" successMessage="Member added.">
             <Field label="Name">
@@ -128,8 +132,9 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
             <SubmitButton>Add member</SubmitButton>
           </ActionForm>
         </Card>
-        </EditOnly>
+        </Can>
       </div>
     </>
+    </RoleProvider>
   );
 }
