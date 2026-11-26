@@ -107,7 +107,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
 
         <div className="space-y-6">
           <Card title="Details">
-            <ActionForm action={updateRelease} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
+            <ActionForm version={[r.name, r.version, toISODate(r.targetDate), r.notes].join("|")} action={updateRelease} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
               <input type="hidden" name="id" value={r.id} />
               <div className="grid grid-cols-[1fr_6rem] gap-3">
                 <Field label="Name"><Input name="name" required maxLength={100} defaultValue={r.name} /></Field>
@@ -121,7 +121,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
           </Card>
 
           <Card title="Deployment">
-            <ActionForm action={setDeployed} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
+            <ActionForm version={r.deployedDate ? toISODate(r.deployedDate) : "none"} action={setDeployed} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
               <input type="hidden" name="id" value={r.id} />
               <Field label="Actual deployment date" hint="Leave empty if it has not been deployed yet.">
                 <Input type="date" name="deployedDate" defaultValue={r.deployedDate ? toISODate(r.deployedDate) : ""} />

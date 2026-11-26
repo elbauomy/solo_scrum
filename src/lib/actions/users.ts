@@ -9,6 +9,14 @@ import { type ActionState, toActionError } from "@/lib/action-state";
 import { displayName as titleCase, normalizeName } from "@/lib/credentials";
 import { hashPassword, passwordProblem } from "@/lib/passwords";
 import { UserError } from "@/lib/sprint-ops";
+import { recordAudit } from "@/lib/audit";
+import { changedFields } from "@/lib/audit-entry";
+
+/** What the audit log keeps about a user (never the password). */
+async function snapshot(id: string) {
+  const u = await db.user.findUnique({ where: { id }, include: { role: { select: { name: true } }, member: { select: { name: true } } } });
+  return u ? { displayName: u.displayName, username: u.username, email: u.email, role: u.role.name, member: u.member?.name ?? null, active: u.active } : null;
+}
 
 const optional = z.preprocess((v) => (v === "" || v == null ? null : String(v).trim()), z.string().nullable());
 
@@ -45,7 +53,7 @@ async function assertAdminRemains(userId: string, next: { roleId?: string; activ
 }
 
 export async function createUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("users.manage");
+  const me = await requirePermission("users.manage");
   let id: string;
   try {
     const data = userFields.parse(Object.fromEntries(formData.entries()));
@@ -58,6 +66,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
       data: { ...data, displayName: titleCase(data.displayName), passwordHash: await hashPassword(password), mustChangePassword: true },
     });
     id = user.id;
+    await recordAudit({ action: "USER_CREATED", user: me, record: { type: "User", id: user.id, name: user.displayName }, details: { after: await snapshot(user.id) } });
   } catch (err) {
     return fail(err);
   }
@@ -76,11 +85,21 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
     await assertFree(data, id);
     await assertAdminRemains(id, { roleId: data.roleId, active });
     const before = await db.user.findUniqueOrThrow({ where: { id } });
+    const was = await snapshot(id);
     await db.user.update({
       where: { id },
       // Disabling ends the user's sessions at once.
       data: { ...data, displayName: titleCase(data.displayName), active, sessionVersion: before.active && !active ? { increment: 1 } : undefined },
     });
+    const now = await snapshot(id);
+    if (was && now) {
+      const { active: wasActive, ...restBefore } = was;
+      const { active: isActive, ...restAfter } = now;
+      const diff = changedFields(restBefore, restAfter);
+      const record = { type: "User", id, name: now.displayName };
+      if (diff) await recordAudit({ action: "USER_UPDATED", user: me, record, details: diff });
+      if (wasActive !== isActive) await recordAudit({ action: isActive ? "USER_ENABLED" : "USER_DISABLED", user: me, record });
+    }
   } catch (err) {
     return fail(err);
   }
@@ -89,7 +108,7 @@ export async function updateUser(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function resetUserPassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("users.manage");
+  const me = await requirePermission("users.manage");
   try {
     const id = String(formData.get("id"));
     const user = await db.user.findUnique({ where: { id } });
@@ -101,6 +120,7 @@ export async function resetUserPassword(_prev: ActionState, formData: FormData):
       where: { id },
       data: { passwordHash: await hashPassword(password), mustChangePassword: true, sessionVersion: { increment: 1 } },
     });
+    await recordAudit({ action: "PASSWORD_RESET", user: me, record: { type: "User", id: user.id, name: user.displayName } });
     return { ok: true, message: `Password reset. Give ${user.displayName} the temporary password; they choose their own at the next sign-in. Their open sessions were signed out.` };
   } catch (err) {
     return fail(err);
@@ -113,7 +133,9 @@ export async function deleteUser(_prev: ActionState, formData: FormData): Promis
     const id = String(formData.get("id"));
     if (id === me.id) return { error: "You cannot delete your own account." };
     await assertAdminRemains(id, { deleting: true });
+    const was = await snapshot(id);
     await db.user.delete({ where: { id } });
+    await recordAudit({ action: "USER_DELETED", user: me, record: { type: "User", id, name: was?.displayName ?? null }, details: { before: was } });
   } catch (err) {
     return fail(err);
   }

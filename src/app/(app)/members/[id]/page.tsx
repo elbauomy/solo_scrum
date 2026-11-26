@@ -59,7 +59,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
       <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
         <div className="space-y-6">
           <Card title="Details">
-            <ActionForm action={updateMember} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
+            <ActionForm version={member.updatedAt.toISOString()} action={updateMember} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
               <input type="hidden" name="id" value={member.id} />
               <Field label="Name">
                 <Input name="name" required maxLength={100} defaultValue={member.name} />

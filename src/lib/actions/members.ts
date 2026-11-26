@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { parseDate } from "@/lib/dates";
 import { type ActionState, isoDate, optionalText, requiredName, toActionError } from "@/lib/action-state";
@@ -169,12 +170,15 @@ export async function saveLobAllocations(_prev: ActionState, formData: FormData)
 
 /** Delete the selected members. Their tasks become unassigned; their squad hours, leave, sprint capacity and standup notes are removed with them. */
 export async function deleteMembers(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("members.manage");
+  const me = await requirePermission("members.manage");
   try {
     const ids = formData.getAll("id").map(String).filter(Boolean);
     if (ids.length === 0) return { error: "Tick at least one member first." };
-    const found = await db.member.findMany({ where: { id: { in: ids } }, select: { id: true } });
-    await db.member.deleteMany({ where: { id: { in: found.map((m) => m.id) } } });
+    const found = await db.member.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+    await db.$transaction(async (tx) => {
+      await tx.member.deleteMany({ where: { id: { in: found.map((m) => m.id) } } });
+      await recordAudit({ action: "BULK_DELETE", user: me, record: { type: "Members" }, details: { recordType: "Member", count: found.length, members: found.map((m) => m.name) } }, tx);
+    });
     revalidatePath("/", "layout");
     return { ok: true, message: `Deleted ${found.length} member${found.length === 1 ? "" : "s"}.` };
   } catch (err) {

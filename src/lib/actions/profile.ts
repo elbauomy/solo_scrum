@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { type ActionState, toActionError } from "@/lib/action-state";
 import { hashPassword, passwordProblem, verifyPassword } from "@/lib/passwords";
 import { firstAllowedPath } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 /** Any signed-in user changes their own password. Other open sessions of this user are signed out. */
 export async function changePassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -30,6 +31,7 @@ export async function changePassword(_prev: ActionState, formData: FormData): Pr
       data: { passwordHash: await hashPassword(next), mustChangePassword: false, sessionVersion: { increment: 1 } },
     });
     await startSession(updated);
+    await recordAudit({ action: "PASSWORD_CHANGED", user: me, record: { type: "User", id: me.id, name: me.displayName }, details: { atFirstSignIn: wasTemporary } });
   } catch (err) {
     return toActionError(err);
   }

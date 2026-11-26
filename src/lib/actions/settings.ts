@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
+import { changedFields } from "@/lib/audit-entry";
+import { toISODate } from "@/lib/dates";
 import { db } from "@/lib/db";
-import { formatWorkingDays } from "@/lib/settings";
+import { formatWorkingDays, getSettings } from "@/lib/settings";
 import { parseDate } from "@/lib/dates";
 import { type ActionState, isoDate, requiredName, toActionError } from "@/lib/action-state";
 
@@ -15,15 +18,22 @@ const settingsSchema = z.object({
 });
 
 export async function updateSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("settings.manage");
+  const me = await requirePermission("settings.manage");
   try {
     const data = settingsSchema.parse({
       workingDays: formData.getAll("workingDays"),
       defaultDailyHours: formData.get("defaultDailyHours"),
       defaultSprintLengthDays: formData.get("defaultSprintLengthDays"),
     });
-    const row = { ...data, workingDays: formatWorkingDays(data.workingDays) };
+    const days = [...new Set(data.workingDays)].sort((a, b) => a - b);
+    const before = await getSettings();
+    const row = { ...data, workingDays: formatWorkingDays(days) };
     await db.setting.upsert({ where: { id: 1 }, update: row, create: { id: 1, ...row } });
+    const diff = changedFields(
+      { workingDays: before.workingDays, defaultDailyHours: before.defaultDailyHours, defaultSprintLengthDays: before.defaultSprintLengthDays },
+      { ...data, workingDays: days },
+    );
+    if (diff) await recordAudit({ action: "SETTINGS_CHANGED", user: me, record: { type: "Settings", name: "Working calendar" }, details: diff });
   } catch (err) {
     return toActionError(err);
   }
@@ -34,10 +44,11 @@ export async function updateSettings(_prev: ActionState, formData: FormData): Pr
 const holidaySchema = z.object({ date: isoDate, name: requiredName });
 
 export async function addHoliday(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("settings.manage");
+  const me = await requirePermission("settings.manage");
   try {
     const data = holidaySchema.parse({ date: formData.get("date"), name: formData.get("name") });
-    await db.holiday.create({ data: { date: parseDate(data.date), name: data.name } });
+    const h = await db.holiday.create({ data: { date: parseDate(data.date), name: data.name } });
+    await recordAudit({ action: "SETTINGS_CHANGED", user: me, record: { type: "Holiday", id: h.id, name: `${data.date} ${data.name}` }, details: { holidayAdded: { date: data.date, name: data.name } } });
   } catch (err) {
     const res = toActionError(err);
     if (res.error?.startsWith("That name")) return { error: "There is already a holiday on that date." };
@@ -48,9 +59,10 @@ export async function addHoliday(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function deleteHoliday(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("settings.manage");
+  const me = await requirePermission("settings.manage");
   try {
-    await db.holiday.delete({ where: { id: String(formData.get("id")) } });
+    const h = await db.holiday.delete({ where: { id: String(formData.get("id")) } });
+    await recordAudit({ action: "SETTINGS_CHANGED", user: me, record: { type: "Holiday", id: h.id, name: `${toISODate(h.date)} ${h.name}` }, details: { holidayRemoved: { date: toISODate(h.date), name: h.name } } });
   } catch (err) {
     return toActionError(err);
   }
