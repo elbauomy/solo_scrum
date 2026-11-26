@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatWorkingDays } from "@/lib/settings";
 import { parseDate } from "@/lib/dates";
@@ -15,7 +15,7 @@ const settingsSchema = z.object({
 });
 
 export async function updateSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("settings.manage");
   try {
     const data = settingsSchema.parse({
       workingDays: formData.getAll("workingDays"),
@@ -34,7 +34,7 @@ export async function updateSettings(_prev: ActionState, formData: FormData): Pr
 const holidaySchema = z.object({ date: isoDate, name: requiredName });
 
 export async function addHoliday(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("settings.manage");
   try {
     const data = holidaySchema.parse({ date: formData.get("date"), name: formData.get("name") });
     await db.holiday.create({ data: { date: parseDate(data.date), name: data.name } });
@@ -48,7 +48,7 @@ export async function addHoliday(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function deleteHoliday(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAuth();
+  await requirePermission("settings.manage");
   try {
     await db.holiday.delete({ where: { id: String(formData.get("id")) } });
   } catch (err) {

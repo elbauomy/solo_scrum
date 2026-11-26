@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { createSquad } from "@/lib/actions/squads";
 import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { Card, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
 import { SquadFields } from "@/components/entity-fields";
-import { EditOnly } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 export default async function SquadsPage({ searchParams }: PageProps<"/squads">) {
+  const me = await requirePageAccess("squads.view");
   const { q } = (await searchParams) as { q?: string };
   const [squads, settings] = await Promise.all([
     db.squad.findMany({
@@ -19,6 +22,7 @@ export default async function SquadsPage({ searchParams }: PageProps<"/squads">)
   ]);
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("squads.manage")}>
     <>
       <PageHeader title="Squads" description="Create, edit and remove squads at any time." />
 
@@ -71,15 +75,16 @@ export default async function SquadsPage({ searchParams }: PageProps<"/squads">)
           )}
         </Card>
 
-        <EditOnly>
+        <Can perm="squads.manage">
         <Card title="Add squad">
           <ActionForm action={createSquad} className="space-y-3" successMessage="Squad added.">
             <SquadFields defaultSprint={settings.defaultSprintLengthDays} />
             <SubmitButton>Add squad</SubmitButton>
           </ActionForm>
         </Card>
-        </EditOnly>
+        </Can>
       </div>
     </>
+    </RoleProvider>
   );
 }

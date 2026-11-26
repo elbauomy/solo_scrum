@@ -46,6 +46,10 @@ npm run build
 npm start
 ```
 
+The first sign-in on an empty database turns the two accounts from `APP_PASSWORD` / `VIEWER_PASSWORD` into users
+(Administrator and Viewer). After that, users, roles and passwords are managed in the app (**Users**, **Roles & Permissions**,
+and each person's **profile**). "Sign in with Microsoft" is optional; its settings are listed in docs/SQL_SERVER.md.
+
 ## Running locally (developers)
 
 ```bash

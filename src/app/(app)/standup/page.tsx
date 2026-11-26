@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { db } from "@/lib/db";
 import { getWorkCalendar } from "@/lib/settings";
 import { isWorkingDay } from "@/lib/capacity";
@@ -12,6 +14,7 @@ import { Badge, Card, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
 type Q = { squad?: string; date?: string; member?: string; from?: string; to?: string; hsquad?: string; hmember?: string };
 
 export default async function StandupPage({ searchParams }: PageProps<"/standup">) {
+  const me = await requirePageAccess("standup.view");
   const f = (await searchParams) as Q;
   const [squads, cal] = await Promise.all([db.squad.findMany({ orderBy: { name: "asc" } }), getWorkCalendar()]);
   const squadId = f.squad || squads[0]?.id || "";
@@ -90,6 +93,7 @@ export default async function StandupPage({ searchParams }: PageProps<"/standup"
   const exportQuery = toQuery({ squad: f.hsquad, member: f.hmember, from: toISODate(hFrom), to: toISODate(hTo) });
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("standup.edit")}>
     <>
       <PageHeader title="Daily Standup" description="Choose the squad and the day, then type each person's status. Your notes are kept as history." />
 
@@ -197,5 +201,6 @@ export default async function StandupPage({ searchParams }: PageProps<"/standup"
         )}
       </Card>
     </>
+    </RoleProvider>
   );
 }

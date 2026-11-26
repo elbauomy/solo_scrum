@@ -1,15 +1,18 @@
 import { db } from "@/lib/db";
+import { requirePageAccess, can } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { SprintImportForm } from "@/components/sprint-import-form";
 import { Card, LinkButton, PageHeader } from "@/components/ui";
-import { canEdit } from "@/components/edit-only";
 
 // Reading a large sheet and saving every story and task can take a few seconds.
 export const maxDuration = 60;
 
 export default async function SprintImportPage() {
-  const edit = await canEdit();
+  const me = await requirePageAccess("sprints.import");
+  const edit = await can("sprints.import");
   const lobs = await db.lineOfBusiness.findMany({ orderBy: { name: "asc" }, include: { squad: { select: { name: true } } } });
   return (
+    <RoleProvider readOnly={!me.permissions.has("sprints.import")}>
     <>
       <PageHeader
         title="Import sprint planning"
@@ -19,7 +22,7 @@ export default async function SprintImportPage() {
       {edit ? (
       <SprintImportForm lobs={lobs.map((l) => ({ id: l.id, label: `${l.key} · ${l.name} (${l.squad.name})` }))} />
       ) : (
-        <Card><p className="py-4 text-center text-sm text-slate-600">Importing is only available to the owner of the system. This account is view-only.</p></Card>
+        <Card><p className="py-4 text-center text-sm text-slate-600">Your role does not allow importing sprint planning sheets.</p></Card>
       )}
       <Card title="How the sheet is read" className="mt-6">
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-600">
@@ -33,5 +36,6 @@ export default async function SprintImportPage() {
         </ul>
       </Card>
     </>
+    </RoleProvider>
   );
 }

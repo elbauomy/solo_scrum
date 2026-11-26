@@ -80,6 +80,8 @@ model Member {
   sprintShares SprintMemberShare[]
   sprintPlans  SprintMemberPlan[]
   standups     StandupEntry[]
+  /// The sign-in account of this member, if they have one
+  user         User?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 }
@@ -347,4 +349,56 @@ model SprintPause {
   createdAt      DateTime  @default(now())
 
   @@index([sprintId, startDate])
+}
+
+/// Someone who can sign in. Usually linked to a member, but it does not have to be (for example an IT administrator).
+/// SQL Server: the unique indexes on email and memberId are created as FILTERED indexes (WHERE ... IS NOT NULL) in the
+/// migration, because a plain unique index would allow only one user without an email or member. See docs/SQL_SERVER.md.
+model User {
+  id                 String    @id @default(cuid()) @db.NVarChar(36)
+  /// Lower-case, single spaces: what people type to sign in (for example "khaled elbauomy")
+  username           String    @unique @db.NVarChar(100)
+  /// Shown in the app, for example "Khaled Elbauomy"
+  displayName        String    @db.NVarChar(200)
+  /// Lower-case. Used to match a Microsoft account (single sign-on). Optional.
+  email              String?   @unique @db.NVarChar(200)
+  /// scrypt hash (see src/lib/passwords.ts). Empty for accounts that only sign in with Microsoft.
+  passwordHash       String?   @db.NVarChar(200)
+  /// Set when an administrator gives a temporary password: the user must choose their own first
+  mustChangePassword Boolean   @default(false)
+  active             Boolean   @default(true)
+  roleId             String    @db.NVarChar(36)
+  role               Role      @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  memberId           String?   @unique @db.NVarChar(36)
+  member             Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  /// Raised when the password changes or is reset, so every other open session ends
+  sessionVersion     Int       @default(1)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([roleId])
+}
+
+/// A named set of permissions. Each user has exactly one role.
+model Role {
+  id          String           @id @default(cuid()) @db.NVarChar(36)
+  name        String           @unique @db.NVarChar(60)
+  description String           @default("") @db.NVarChar(300)
+  /// The Administrator role: has every permission and cannot be changed or deleted
+  builtIn     Boolean          @default(false)
+  permissions RolePermission[]
+  users       User[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+/// One permission of a role, for example "sprints.manage" (the list is in src/lib/permissions.ts).
+model RolePermission {
+  id         String @id @default(cuid()) @db.NVarChar(36)
+  roleId     String @db.NVarChar(36)
+  permission String @db.NVarChar(50)
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([roleId, permission])
 }

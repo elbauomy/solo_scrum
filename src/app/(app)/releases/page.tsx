@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { loadAnalytics } from "@/lib/analytics";
 import { createRelease } from "@/lib/actions/releases";
 import { formatDate, toISODate, addDays } from "@/lib/dates";
@@ -7,11 +9,12 @@ import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { fmtH } from "@/components/sprint-ui";
 import { Card, Empty, Field, Input, PageHeader, Select, Table, Td, Textarea, Th } from "@/components/ui";
 import { ReleaseStatus } from "@/components/release-status";
-import { EditOnly } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 type Q = { squad?: string; lob?: string; status?: string; from?: string; to?: string; q?: string };
 
 export default async function ReleasesPage({ searchParams }: PageProps<"/releases">) {
+  const me = await requirePageAccess("releases.view");
   const f = (await searchParams) as Q;
   const a = await loadAnalytics();
   const from = dateParam(f.from);
@@ -26,6 +29,7 @@ export default async function ReleasesPage({ searchParams }: PageProps<"/release
     .sort((x, y) => x.targetDate.getTime() - y.targetDate.getTime());
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("releases.manage")}>
     <>
       <PageHeader title="Releases" description="A release is a deployment of one line of business. It contains several of that line's sprints." />
 
@@ -89,7 +93,7 @@ export default async function ReleasesPage({ searchParams }: PageProps<"/release
           <p className="mt-3 text-xs text-slate-500">Forecast = remaining hours of the release&apos;s open sprints ÷ the line&apos;s average velocity (last 3 closed sprints).</p>
         </Card>
 
-        <EditOnly>
+        <Can perm="releases.manage">
         <Card title="New release">
           {a.lobs.length === 0 ? (
             <Empty>Create a line of business first.</Empty>
@@ -111,8 +115,9 @@ export default async function ReleasesPage({ searchParams }: PageProps<"/release
             </ActionForm>
           )}
         </Card>
-        </EditOnly>
+        </Can>
       </div>
     </>
+    </RoleProvider>
   );
 }

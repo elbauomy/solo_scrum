@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePageAccess, can } from "@/lib/auth";
+import { RoleProvider } from "@/components/role-provider";
 import { loadAnalytics, sprintLengthFor } from "@/lib/analytics";
 import { formatDate, toISODate } from "@/lib/dates";
 import { applyCls, dateParam, selectCls } from "@/lib/filters";
@@ -7,12 +9,13 @@ import { BulkDeleteBar } from "@/components/bulk-delete";
 import { deleteSprints } from "@/lib/actions/sprints";
 import { HealthBadge, SprintStateBadge, fmtH } from "@/components/sprint-ui";
 import { Card, Empty, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui";
-import { EditOnly, canEdit } from "@/components/edit-only";
+import { Can } from "@/components/edit-only";
 
 type Q = { squad?: string; lob?: string; state?: string; release?: string; from?: string; to?: string; q?: string };
 
 export default async function SprintsPage({ searchParams }: PageProps<"/sprints">) {
-  const edit = await canEdit();
+  const me = await requirePageAccess("sprints.view");
+  const edit = await can("sprints.manage");
   const f = (await searchParams) as Q;
   const a = await loadAnalytics();
   const from = dateParam(f.from);
@@ -34,8 +37,9 @@ export default async function SprintsPage({ searchParams }: PageProps<"/sprints"
   }));
 
   return (
+    <RoleProvider readOnly={!me.permissions.has("sprints.manage")}>
     <>
-      <PageHeader title="Sprints" description="Each line of business runs its own sprints. Sprints may overlap." actions={edit ? <LinkButton href="/sprints/import" variant="primary">Import sprint planning</LinkButton> : undefined} />
+      <PageHeader title="Sprints" description="Each line of business runs its own sprints. Sprints may overlap." actions={(await can("sprints.import")) ? <LinkButton href="/sprints/import" variant="primary">Import sprint planning</LinkButton> : undefined} />
 
       <Card className="mb-4">
         <form className="flex flex-wrap items-end gap-2">
@@ -120,7 +124,7 @@ export default async function SprintsPage({ searchParams }: PageProps<"/sprints"
           {edit && <p className="mt-3 text-xs text-slate-500">Only planned sprints can be ticked for deletion; active, paused and closed sprints keep their history.</p>}
         </Card>
 
-        <EditOnly>
+        <Can perm="sprints.manage">
         <Card title="New sprint">
           {lobOptions.length === 0 ? (
             <Empty>Create a line of business first.</Empty>
@@ -128,8 +132,9 @@ export default async function SprintsPage({ searchParams }: PageProps<"/sprints"
             <NewSprintForm lobs={lobOptions} defaultLobId={f.lob} today={toISODate(a.today)} />
           )}
         </Card>
-        </EditOnly>
+        </Can>
       </div>
     </>
+    </RoleProvider>
   );
 }
