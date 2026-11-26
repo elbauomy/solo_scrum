@@ -283,6 +283,14 @@ Hours "burn" only when a task becomes **Done**.
   `Can` (show a part only with a permission) and `useCan`. The server check is the real protection; hiding is only convenience.
 - **First sign-in after the update**: when the user table is empty, `APP_PASSWORD` / `VIEWER_PASSWORD` become the first two users
   (Administrator and Viewer). After that those settings are not used.
+- **Audit log** (BR-57, `AuditLog`, `audit-entry.ts` + `audit.ts`): one row per security or administration action, with
+  the action code, the signed-in user (empty for a failed sign-in, which stores the typed user name, first 100 characters),
+  the record affected, details as JSON text (before and after for changes) and the client address (`X-Forwarded-For`).
+  Any key that looks like a password, hash, token, secret, cookie or credential is replaced with "[removed]" before saving.
+  Entries are written in the action's own transaction where it has one (imports, bulk deletes); otherwise right after it,
+  and a failed write only goes to the server log. No foreign key to `User`, so entries outlive deleted users. Read on
+  `/audit` (filters, 50 per page, Cairo time), exported to Excel, included in the full backup; never edited or deleted.
+  `WorkItemHistory.changedById` records who made each item change.
 - **Microsoft sign-in** (`sso.ts`, optional): OpenID Connect authorization code flow with PKCE against Microsoft Entra ID (single tenant).
   State, nonce and the PKCE verifier travel in a signed 10-minute cookie; the ID token is verified against Microsoft's published keys,
   issuer, audience, tenant and nonce. The account is matched to an active user by email; there is no automatic account creation.

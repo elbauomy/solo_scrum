@@ -30,7 +30,7 @@ export default async function LobPage({ params }: PageProps<"/lobs/[id]">) {
         actions={<LinkButton href="/lobs">← Back to lines of business</LinkButton>}
       />
       <Card title="Edit line of business" className="max-w-xl">
-        <ActionForm action={updateLob} className="space-y-3" resetOnSuccess={false}>
+        <ActionForm version={lob.updatedAt.toISOString()} action={updateLob} className="space-y-3" resetOnSuccess={false}>
           <input type="hidden" name="id" value={lob.id} />
           <LobFields squads={squads} values={lob} />
           <SubmitButton>Save changes</SubmitButton>

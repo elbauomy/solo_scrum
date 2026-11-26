@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { db, type Tx } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { workingDaysBetween } from "@/lib/capacity";
 import { parseDate } from "@/lib/dates";
 import { findPlanningSheet, readGrids } from "@/lib/excel";
@@ -18,7 +19,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
  * mode "check": show what would happen. mode "import": create or update the sprint, its members' capacity, stories and tasks.
  */
 export async function importSprintPlan(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("sprints.import");
+  const me = await requirePermission("sprints.import");
   try {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) return { error: "Please choose your sprint planning file (.xlsx or .csv)." };
@@ -82,7 +83,20 @@ export async function importSprintPlan(_prev: ActionState, formData: FormData): 
       return { ok: true, message: "The sheet is valid. Review what will happen below, then click Import.", preview: plan.preview! };
     }
 
-    const sprintId = await db.$transaction((tx) => applyOps(tx, plan.ops!), { timeout: 60000, maxWait: 10000 });
+    const t0 = plan.preview!.totals;
+    const sprintId = await db.$transaction(
+      async (tx) => {
+        const id = await applyOps(tx, plan.ops!, me.id);
+        await recordAudit({
+          action: "PLANNING_SHEET_IMPORTED",
+          user: me,
+          record: { type: "Sprint", id, name: plan.preview!.sprint.name },
+          details: { file: file instanceof File ? file.name : null, stories: t0.stories, newStories: t0.newStories, tasks: t0.tasks, newTasks: t0.newTasks, updatedTasks: t0.updatedTasks, hours: t0.hours },
+        }, tx);
+        return id;
+      },
+      { timeout: 60000, maxWait: 10000 },
+    );
     revalidatePath("/", "layout");
     const t = plan.preview!.totals;
     return {
@@ -97,7 +111,7 @@ export async function importSprintPlan(_prev: ActionState, formData: FormData): 
 }
 
 
-async function applyOps(tx: Tx, ops: ImportOps): Promise<string> {
+async function applyOps(tx: Tx, ops: ImportOps, by: string): Promise<string> {
   // ---- members and squad membership
   const newMemberIds = ops.newMembers.map(() => randomUUID());
   if (ops.newMembers.length) {
@@ -195,7 +209,7 @@ async function applyOps(tx: Tx, ops: ImportOps): Promise<string> {
     await tx.workItem.update({ where: { id: u.id }, data: { estimateHours: u.hours } });
     history.push({ workItemId: u.id, field: "estimate", oldValue: u.oldHours == null ? null : String(u.oldHours), newValue: String(u.hours) });
   }
-  if (history.length) await tx.workItemHistory.createMany({ data: history });
+  if (history.length) await tx.workItemHistory.createMany({ data: history.map((h) => ({ ...h, changedById: by })) });
   await tx.lineOfBusiness.update({ where: { id: ops.lobId }, data: { nextItemNumber: number } });
   return sprintId;
 }

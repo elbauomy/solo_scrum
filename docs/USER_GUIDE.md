@@ -10,6 +10,13 @@ A simple rhythm for running your squads. Every list has filters at the top; the 
 - The menu only shows the pages your role may open, and the system refuses any change your role does not allow, even if someone tries to force it.
 - The first sign-in after this update turned the two earlier accounts into users: **khaled elbauomy** (Administrator) and **remoon milad** (Viewer), with their existing passwords.
 
+## Audit log
+*Administration → Audit log* lists security and administration actions: sign-ins (and failed attempts, with the user name that was typed), sign-outs, password changes and resets, user and role changes (with the permissions added or removed), settings and holiday changes, backup downloads, imports and bulk deletes. Each entry shows when it happened (Cairo time), who did it, what it affected and the computer's address. Open an entry to see the values before and after the change.
+- Filter by dates (the last 7 days by default), user and action; 50 entries per page, newest first. **Export to Excel** downloads the filtered entries (the export itself is recorded too).
+- Nobody can change or delete an entry, and entries are never removed automatically. Passwords and secrets are never written into the log.
+- It needs the *Audit log: View and export* permission. Administrators have it; the Viewer role does not.
+- Each work item's history now also shows who made each change.
+
 ## Sign in with Microsoft (optional)
 When it is switched on, the login page shows **Sign in with Microsoft**. It matches the Microsoft account to a user by **work email**, so add each person's email on their user first; nobody gets in just by having a Microsoft account. To switch it on, ACT's IT registers the app in Microsoft Entra ID (see the approvals document) and gives four values to put in the hosting settings: `MS_ENTRA_TENANT_ID`, `MS_ENTRA_CLIENT_ID`, `MS_ENTRA_CLIENT_SECRET`, and `APP_URL` (this site's address). The redirect address to register is `APP_URL` followed by `/api/auth/microsoft/callback`.
 

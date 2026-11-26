@@ -17,6 +17,7 @@ describe("permissions", () => {
     for (const k of VIEWER_PERMISSIONS) expect(k.endsWith(".view") || k === "reports.export" || k === "data.backup").toBe(true);
     expect(VIEWER_PERMISSIONS).not.toContain("users.manage");
     expect(VIEWER_PERMISSIONS).not.toContain("backlog.edit");
+    expect(VIEWER_PERMISSIONS).not.toContain("audit.view");
   });
 
   it("every menu page is reachable by some permission", () => {

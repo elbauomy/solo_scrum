@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth";
 import { db, type Tx } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { type ActionState, toActionError } from "@/lib/action-state";
 import { PARENT_TYPES, PRIORITIES, TYPES, itemKey, nextRank, statusesFor, TYPE_LABEL, validateParent } from "@/lib/work-items";
 
@@ -44,7 +45,7 @@ function refresh() {
 }
 
 export async function createWorkItem(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("backlog.edit");
+  const by = (await requirePermission("backlog.edit")).id;
   try {
     const data = createSchema.parse(Object.fromEntries(formData.entries()));
     await db.$transaction(async (tx) => {
@@ -88,9 +89,9 @@ export async function createWorkItem(_prev: ActionState, formData: FormData): Pr
           rank: nextRank(siblings.map((s) => s.rank)),
         },
       });
-      await tx.workItemHistory.create({ data: { workItemId: item.id, field: "created", newValue: data.type } });
+      await tx.workItemHistory.create({ data: { workItemId: item.id, field: "created", newValue: data.type, changedById: by } });
       if (isTask && parentSprintId) {
-        await tx.workItemHistory.create({ data: { workItemId: item.id, field: "sprint", newValue: parentSprintId } });
+        await tx.workItemHistory.create({ data: { workItemId: item.id, field: "sprint", newValue: parentSprintId, changedById: by } });
       }
     });
   } catch (err) {
@@ -117,7 +118,7 @@ const updateSchema = z.object({
 type Change = { field: string; oldValue: string | null; newValue: string | null };
 
 export async function updateWorkItem(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("backlog.edit");
+  const by = (await requirePermission("backlog.edit")).id;
   try {
     const data = updateSchema.parse(Object.fromEntries(formData.entries()));
     await db.$transaction(async (tx) => {
@@ -191,7 +192,7 @@ export async function updateWorkItem(_prev: ActionState, formData: FormData): Pr
         },
       });
       if (changes.length) {
-        await tx.workItemHistory.createMany({ data: changes.map((c) => ({ workItemId: item.id, ...c })) });
+        await tx.workItemHistory.createMany({ data: changes.map((c) => ({ workItemId: item.id, ...c, changedById: by })) });
       }
     });
   } catch (err) {
@@ -203,7 +204,7 @@ export async function updateWorkItem(_prev: ActionState, formData: FormData): Pr
 
 /** Quick status change from lists and boards. */
 export async function setWorkItemStatus(id: string, status: WorkItemStatus): Promise<ActionState> {
-  await requirePermission("backlog.edit", "board.move");
+  const me = await requirePermission("backlog.edit", "board.move");
   try {
     const item = await db.workItem.findUnique({ where: { id } });
     if (!item) return { error: "This item no longer exists." };
@@ -216,7 +217,7 @@ export async function setWorkItemStatus(id: string, status: WorkItemStatus): Pro
         where: { id },
         data: { status, doneAt: status === "DONE" ? new Date() : null },
       }),
-      db.workItemHistory.create({ data: { workItemId: id, field: "status", oldValue: item.status, newValue: status } }),
+      db.workItemHistory.create({ data: { workItemId: id, field: "status", oldValue: item.status, newValue: status, changedById: me.id } }),
     ]);
   } catch (err) {
     return fail(err);
@@ -268,7 +269,7 @@ export async function deleteWorkItem(_prev: ActionState, formData: FormData): Pr
  * (select a parent and its whole tree, or just the leaves). Anything else is kept and listed.
  */
 export async function deleteWorkItems(ids: string[]): Promise<ActionState> {
-  await requirePermission("backlog.delete");
+  const me = await requirePermission("backlog.delete");
   try {
     const wanted = z.array(z.string().min(1)).max(3000).parse(ids);
     if (wanted.length === 0) return { error: "Tick at least one item first." };
@@ -295,6 +296,14 @@ export async function deleteWorkItems(ids: string[]): Promise<ActionState> {
         if (leaves.length === 0) break;
         await tx.workItem.deleteMany({ where: { id: { in: leaves } } });
         remaining = new Set([...remaining].filter((id) => !leaves.includes(id)));
+      }
+      if (going.size > 0) {
+        await recordAudit({
+          action: "BULK_DELETE",
+          user: me,
+          record: { type: "Work items" },
+          details: { recordType: "Work item", count: going.size, items: items.filter((i) => going.has(i.id)).map((i) => `${itemKey(i.lob.key, i.number)} ${i.title}`) },
+        }, tx);
       }
     });
     const kept = items.filter((i) => !going.has(i.id));

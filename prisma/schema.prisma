@@ -168,14 +168,16 @@ model WorkItem {
 
 /// One row per changed field, used for audit and for reports (cycle time, burndown).
 model WorkItemHistory {
-  id         String   @id @default(cuid()) @db.NVarChar(36)
-  workItemId String   @db.NVarChar(36)
-  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id          String   @id @default(cuid()) @db.NVarChar(36)
+  workItemId  String   @db.NVarChar(36)
+  workItem    WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   /// created, title, status, priority, assignee, estimate, blocked, parent
-  field      String   @db.NVarChar(50)
-  oldValue   String?  @db.NVarChar(Max)
-  newValue   String?  @db.NVarChar(Max)
-  changedAt  DateTime @default(now())
+  field       String   @db.NVarChar(50)
+  oldValue    String?  @db.NVarChar(Max)
+  newValue    String?  @db.NVarChar(Max)
+  changedAt   DateTime @default(now())
+  /// The signed-in user who made the change (empty for rows written before the audit log existed)
+  changedById String?  @db.NVarChar(36)
 
   @@index([workItemId, changedAt])
   @@index([field, changedAt])
@@ -401,4 +403,29 @@ model RolePermission {
   role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([roleId, permission])
+}
+
+/// Security and administration actions (BR-57). Written by the app only; never edited or deleted.
+model AuditLog {
+  id            String   @id @default(cuid()) @db.NVarChar(36)
+  /// When it happened (stored in UTC, shown in Cairo time)
+  at            DateTime @default(now())
+  /// The signed-in user (empty for a failed sign-in). No foreign key, so entries outlive deleted users.
+  userId        String?  @db.NVarChar(36)
+  /// The user's name at the time
+  userName      String?  @db.NVarChar(200)
+  /// The user name as typed, for a failed sign-in (first 100 characters)
+  typedUsername String?  @db.NVarChar(100)
+  /// Action code, for example SIGN_IN_SUCCESS (see src/lib/audit.ts)
+  action        String   @db.NVarChar(50)
+  recordType    String?  @db.NVarChar(50)
+  recordId      String?  @db.NVarChar(100)
+  recordName    String?  @db.NVarChar(300)
+  /// JSON text: before and after values for changes. Never passwords, hashes, tokens or secrets.
+  details       String?  @db.NVarChar(Max)
+  ip            String?  @db.NVarChar(100)
+
+  @@index([at])
+  @@index([userId, at])
+  @@index([action, at])
 }
