@@ -1,9 +1,10 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "./db";
-import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, createSessionToken, readSession } from "./session";
+import { ACTIVITY_COOKIE, ACTIVITY_HEADER, SESSION_COOKIE, cookieOptions, createActivityToken, createSessionToken, readSession } from "./session";
+import { isIdleExpired } from "./sign-in-security";
 import { ForbiddenError } from "./forbidden";
 import { ALL_PERMISSIONS, firstAllowedPath, hasAny } from "./permissions";
 
@@ -22,33 +23,34 @@ export type CurrentUser = {
 
 export async function startSession(user: { id: string; sessionVersion: number }): Promise<void> {
   const store = await cookies();
-  store.set(SESSION_COOKIE, await createSessionToken(user.id, user.sessionVersion), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  });
+  store.set(SESSION_COOKIE, await createSessionToken(user.id, user.sessionVersion), cookieOptions());
+  store.set(ACTIVITY_COOKIE, await createActivityToken(user.id, Math.floor(Date.now() / 1000)), cookieOptions());
 }
 
 export async function endSession(): Promise<void> {
-  (await cookies()).delete(SESSION_COOKIE);
+  const store = await cookies();
+  store.delete(SESSION_COOKIE);
+  store.delete(ACTIVITY_COOKIE);
 }
 
 /**
- * Who is signed in (null when nobody). Read once per request. A disabled user, a deleted user, or a session from
- * before a password change counts as nobody.
+ * The session, read once per request. A disabled user, a deleted user, or a session from before a password change
+ * counts as nobody.
  */
-export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+const loadSession = cache(async (): Promise<{ user: CurrentUser | null; idle: boolean }> => {
   const session = await readSession((await cookies()).get(SESSION_COOKIE)?.value);
-  if (!session) return null;
+  if (!session) return { user: null, idle: false };
   const user = await db.user.findUnique({
     where: { id: session.userId },
     include: { role: { include: { permissions: { select: { permission: true } } } } },
   });
-  if (!user || !user.active || user.sessionVersion !== session.version) return null;
+  if (!user || !user.active || user.sessionVersion !== session.version) return { user: null, idle: false };
+  // Idle timeout (BR-58): the previous request was longer ago than the setting.
+  const last = Number((await headers()).get(ACTIVITY_HEADER) || NaN);
+  const setting = await db.setting.findUnique({ where: { id: 1 }, select: { idleMinutes: true } });
+  if (isIdleExpired(Number.isFinite(last) ? last : null, Date.now(), setting?.idleMinutes ?? 120)) return { user: null, idle: true };
   const isAdmin = user.role.builtIn;
-  return {
+  return { idle: false, user: {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
@@ -59,12 +61,23 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     mustChangePassword: user.mustChangePassword,
     hasPassword: Boolean(user.passwordHash),
     memberId: user.memberId,
-  };
+  } };
 });
 
-/** For pages and downloads: anyone signed in. Others go to the login page. */
+/** Who is signed in (null when nobody, or when the session has been idle too long). */
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  return (await loadSession()).user;
+}
+
+/** True when this request carries a session that ended because it was idle too long. */
+export async function sessionWentIdle(): Promise<boolean> {
+  return (await loadSession()).idle;
+}
+
+/** For pages and downloads: anyone signed in. Others go to the login page; an idle session is ended first. */
 export async function requireSession(): Promise<CurrentUser> {
-  const user = await getCurrentUser();
+  const { user, idle } = await loadSession();
+  if (idle) redirect("/api/auth/session-ended");
   if (!user) redirect("/login");
   return user;
 }

@@ -39,3 +39,37 @@ export async function readSession(token: string | undefined): Promise<SessionDat
 export async function isValidSessionToken(token: string | undefined): Promise<boolean> {
   return (await readSession(token)) != null;
 }
+
+// ---------- last activity (BR-58 idle timeout) ----------
+// A separate cookie, renewed by proxy.ts on every request, so it never overwrites the session cookie that sign-in
+// and password changes write. It only says when this browser last made a request for this user.
+
+export const ACTIVITY_COOKIE = "act_seen";
+/** Header proxy.ts passes to the page: the previous activity time in seconds (empty when unknown). */
+export const ACTIVITY_HEADER = "x-act-last-activity";
+
+export async function createActivityToken(userId: string, atSeconds: number): Promise<string> {
+  return new SignJWT({ uid: userId, la: atSeconds })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
+    .sign(secretKey());
+}
+
+export async function readActivity(token: string | undefined): Promise<{ userId: string; at: number } | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
+    if (typeof payload.uid !== "string" || typeof payload.la !== "number") return null;
+    return { userId: payload.uid, at: payload.la };
+  } catch {
+    return null;
+  }
+}
+
+export const cookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: SESSION_MAX_AGE_SECONDS,
+});

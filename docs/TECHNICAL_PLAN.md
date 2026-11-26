@@ -283,6 +283,18 @@ Hours "burn" only when a task becomes **Done**.
   `Can` (show a part only with a permission) and `useCan`. The server check is the real protection; hiding is only convenience.
 - **First sign-in after the update**: when the user table is empty, `APP_PASSWORD` / `VIEWER_PASSWORD` become the first two users
   (Administrator and Viewer). After that those settings are not used.
+- **Sign-in protection** (BR-58, `sign-in-security.ts`): settings `minPasswordLength` (8, 8–64), `maxFailedSignIns` (5, 3–10),
+  `lockMinutes` (15, 5–1440), `idleMinutes` (120, 15–720) on `Setting`. Password rule: minimum length, a letter, a number,
+  different from the current password (checked against the hash). `User.failedSignIns` counts wrong passwords in a row; at the
+  limit `lockedUntil` = now + lock duration (count restarts) and `ACCOUNT_LOCKED` is recorded. While locked, sign-in fails even
+  with the right password. Unknown user names are audited but change no count. Success, Unlock and a temporary password clear
+  both. **Idle timeout:** `proxy.ts` renews a separate signed cookie (`act_seen`, user id + last activity) on every request and
+  passes the previous time to the page in a header it sets itself (a header sent by the browser is removed). `getCurrentUser()`
+  compares it with `idleMinutes`; an idle session goes to `/api/auth/session-ended`, which records `SESSION_EXPIRED`, clears
+  both cookies and opens `/login?ended=idle`. A separate cookie keeps sign-in and password changes, which rewrite the session
+  cookie, from ever being overwritten by the renewal.
+- **Forms** (`ActionForm`) are sent by hand rather than through `<form action>`, because React resets a form after every action
+  call and would wipe what the user typed when the server answers with an error. The form is cleared only after a success.
 - **Audit log** (BR-57, `AuditLog`, `audit-entry.ts` + `audit.ts`): one row per security or administration action, with
   the action code, the signed-in user (empty for a failed sign-in, which stores the typed user name, first 100 characters),
   the record affected, details as JSON text (before and after for changes) and the client address (`X-Forwarded-For`).

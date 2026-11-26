@@ -3,10 +3,12 @@ import { changePassword } from "@/lib/actions/profile";
 import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { Card, Field, PageHeader } from "@/components/ui";
 import { PasswordInput } from "@/components/ui/password-input";
-import { MIN_PASSWORD_LENGTH } from "@/lib/passwords";
+import { getSecuritySettings } from "@/lib/settings";
+import { passwordRuleText } from "@/lib/sign-in-security";
 
 export default async function ProfilePage() {
   const me = await requireSession();
+  const { minPasswordLength } = await getSecuritySettings();
   return (
     <>
       <PageHeader title="Your profile" description="Your account details and your password." />
@@ -32,11 +34,11 @@ export default async function ProfilePage() {
                 <PasswordInput name="current" required autoComplete="current-password" />
               </Field>
             )}
-            <Field label="New password" hint={`At least ${MIN_PASSWORD_LENGTH} characters, not your user name`}>
-              <PasswordInput name="next" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
+            <Field label="New password" hint={passwordRuleText(minPasswordLength)}>
+              <PasswordInput name="next" required minLength={minPasswordLength} autoComplete="new-password" />
             </Field>
             <Field label="New password again">
-              <PasswordInput name="confirm" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
+              <PasswordInput name="confirm" required minLength={minPasswordLength} autoComplete="new-password" />
             </Field>
             <SubmitButton>{me.hasPassword ? "Change password" : "Set password"}</SubmitButton>
           </ActionForm>

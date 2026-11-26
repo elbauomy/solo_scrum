@@ -10,6 +10,20 @@ A simple rhythm for running your squads. Every list has filters at the top; the 
 - The menu only shows the pages your role may open, and the system refuses any change your role does not allow, even if someone tries to force it.
 - The first sign-in after this update turned the two earlier accounts into users: **khaled elbauomy** (Administrator) and **remoon milad** (Viewer), with their existing passwords.
 
+## Sign-in security
+*Settings → Sign-in security* (needs the Settings edit permission; every change is recorded in the audit log):
+
+| Setting | Default | Allowed |
+|---|---|---|
+| Minimum password length | 8 | 8 to 64 |
+| Failed sign-ins before the account locks | 5 | 3 to 10 |
+| Lock duration (minutes) | 15 | 5 to 1440 |
+| End session after this many minutes without activity | 120 | 15 to 720 |
+
+- **Passwords** need at least the minimum length, a letter and a number, and must differ from the current password. The rule shows under every password field. Existing passwords keep working; the rule applies at the next change.
+- **Locked accounts:** after too many wrong passwords in a row, the account locks for the set time, even for the right password. Every failed sign-in shows the same message. On *Users* a locked account shows "Locked until hh:mm"; open it and click **Unlock** (setting a temporary password also unlocks it).
+- **Idle sessions** end after the set time without any activity; the next click goes to the sign-in page with a message.
+
 ## Audit log
 *Administration → Audit log* lists security and administration actions: sign-ins (and failed attempts, with the user name that was typed), sign-outs, password changes and resets, user and role changes (with the permissions added or removed), settings and holiday changes, backup downloads, imports and bulk deletes. Each entry shows when it happened (Cairo time), who did it, what it affected and the computer's address. Open an entry to see the values before and after the change.
 - Filter by dates (the last 7 days by default), user and action; 50 entries per page, newest first. **Export to Excel** downloads the filtered entries (the export itself is recorded too).

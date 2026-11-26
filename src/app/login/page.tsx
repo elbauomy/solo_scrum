@@ -4,7 +4,9 @@ import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { Field, Input } from "@/components/ui";
 import { PasswordInput } from "@/components/ui/password-input";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, sessionWentIdle } from "@/lib/auth";
+import { getSecuritySettings } from "@/lib/settings";
+import { idleEndedMessage } from "@/lib/sign-in-security";
 import { firstAllowedPath } from "@/lib/permissions";
 import { ssoConfig } from "@/lib/sso";
 
@@ -26,9 +28,11 @@ const POINTS = [
 ];
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  if (await sessionWentIdle()) redirect("/api/auth/session-ended");
   const me = await getCurrentUser();
   if (me) redirect(me.mustChangePassword ? "/profile" : firstAllowedPath(me.permissions));
-  const { sso } = (await searchParams) as { sso?: string };
+  const { sso, ended } = (await searchParams) as { sso?: string; ended?: string };
+  const endedMessage = ended === "idle" ? idleEndedMessage((await getSecuritySettings()).idleMinutes) : null;
   const ssoMessage = sso ? SSO_MESSAGES[sso] ?? SSO_MESSAGES.failed : null;
   const ssoOn = ssoConfig() != null;
   return (
@@ -68,6 +72,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <div className="w-full max-w-sm">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
             <p className="mt-1 text-sm text-slate-500">Sign in to Solo Scrum to continue.</p>
+            {endedMessage && (
+              <p role="status" className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{endedMessage}</p>
+            )}
             {ssoMessage && (
               <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{ssoMessage}</p>
             )}

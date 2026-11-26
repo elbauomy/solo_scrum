@@ -7,7 +7,9 @@ import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { type ActionState, toActionError } from "@/lib/action-state";
 import { displayName as titleCase, normalizeName } from "@/lib/credentials";
-import { hashPassword, passwordProblem } from "@/lib/passwords";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
+import { CLEARED, SAME_PASSWORD_MESSAGE, passwordProblem } from "@/lib/sign-in-security";
+import { getSecuritySettings } from "@/lib/settings";
 import { UserError } from "@/lib/sprint-ops";
 import { recordAudit } from "@/lib/audit";
 import { changedFields } from "@/lib/audit-entry";
@@ -58,7 +60,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   try {
     const data = userFields.parse(Object.fromEntries(formData.entries()));
     const password = String(formData.get("password") ?? "");
-    const problem = passwordProblem(password, data.username);
+    const problem = passwordProblem(password, (await getSecuritySettings()).minPasswordLength);
     if (problem) return { error: `Temporary password: ${problem}` };
     if (!(await db.role.findUnique({ where: { id: data.roleId } }))) return { error: "That role no longer exists." };
     await assertFree(data);
@@ -114,11 +116,13 @@ export async function resetUserPassword(_prev: ActionState, formData: FormData):
     const user = await db.user.findUnique({ where: { id } });
     if (!user) return { error: "This user no longer exists." };
     const password = String(formData.get("password") ?? "");
-    const problem = passwordProblem(password, user.username);
+    const problem = passwordProblem(password, (await getSecuritySettings()).minPasswordLength);
     if (problem) return { error: problem };
+    if (await verifyPassword(password, user.passwordHash)) return { error: SAME_PASSWORD_MESSAGE };
     await db.user.update({
       where: { id },
-      data: { passwordHash: await hashPassword(password), mustChangePassword: true, sessionVersion: { increment: 1 } },
+      // A temporary password also unlocks the account.
+      data: { passwordHash: await hashPassword(password), mustChangePassword: true, sessionVersion: { increment: 1 }, ...CLEARED },
     });
     await recordAudit({ action: "PASSWORD_RESET", user: me, record: { type: "User", id: user.id, name: user.displayName } });
     return { ok: true, message: `Password reset. Give ${user.displayName} the temporary password; they choose their own at the next sign-in. Their open sessions were signed out.` };
@@ -141,4 +145,20 @@ export async function deleteUser(_prev: ActionState, formData: FormData): Promis
   }
   revalidatePath("/users");
   redirect("/users");
+}
+
+/** Unlocks an account locked after too many failed sign-ins. */
+export async function unlockUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const me = await requirePermission("users.manage");
+  try {
+    const id = String(formData.get("id"));
+    const user = await db.user.findUnique({ where: { id } });
+    if (!user) return { error: "This user no longer exists." };
+    await db.user.update({ where: { id }, data: CLEARED });
+    await recordAudit({ action: "ACCOUNT_UNLOCKED", user: me, record: { type: "User", id, name: user.displayName }, details: { before: { lockedUntil: user.lockedUntil, failedSignIns: user.failedSignIns } } });
+  } catch (err) {
+    return fail(err);
+  }
+  revalidatePath("/users", "layout");
+  return { ok: true, message: "Unlocked. They can sign in again." };
 }

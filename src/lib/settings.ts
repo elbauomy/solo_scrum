@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import type { WorkCalendar } from "./capacity";
 import { toISODate } from "./dates";
+import type { SecuritySettings } from "./sign-in-security";
 
 /**
  * The single settings row, created with defaults on first use.
@@ -41,4 +42,10 @@ export async function getWorkCalendar(): Promise<WorkCalendar> {
     workingDays: settings.workingDays,
     holidays: new Set(holidays.map((h) => toISODate(h.date))),
   };
+}
+
+/** The sign-in security values (BR-58). */
+export async function getSecuritySettings(): Promise<SecuritySettings> {
+  const s = await getSettings();
+  return { minPasswordLength: s.minPasswordLength, maxFailedSignIns: s.maxFailedSignIns, lockMinutes: s.lockMinutes, idleMinutes: s.idleMinutes };
 }

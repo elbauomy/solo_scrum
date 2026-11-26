@@ -3,13 +3,18 @@ import { requirePageAccess } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createUser } from "@/lib/actions/users";
 import { generateTemporaryPassword } from "@/lib/passwords";
+import { getSecuritySettings } from "@/lib/settings";
+import { passwordRuleText } from "@/lib/sign-in-security";
 import { ActionForm, SubmitButton } from "@/components/ui/forms";
 import { Badge, Card, Empty, Field, Input, PageHeader, Table, Td, Th } from "@/components/ui";
 import { UserFields } from "@/components/user-fields";
 import { formatDate } from "@/lib/dates";
+import { formatCairoTime } from "@/lib/audit-entry";
+import { isLocked } from "@/lib/sign-in-security";
 
 export default async function UsersPage({ searchParams }: PageProps<"/users">) {
   await requirePageAccess("users.manage");
+  const { minPasswordLength } = await getSecuritySettings();
   const { member: memberParam, q } = (await searchParams) as { member?: string; q?: string };
   const [users, roles, freeMembers] = await Promise.all([
     db.user.findMany({
@@ -21,6 +26,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/users">) {
     db.member.findMany({ where: { user: null, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   const preset = freeMembers.find((m) => m.id === memberParam);
+  const now = new Date();
 
   return (
     <>
@@ -61,7 +67,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/users">) {
                     <Td>{u.member?.name ?? <span className="text-slate-400">—</span>}</Td>
                     <Td className="text-xs">{u.lastLoginAt ? formatDate(u.lastLoginAt) : "Never"}</Td>
                     <Td>
-                      {!u.active ? <Badge tone="red">Disabled</Badge> : u.mustChangePassword ? <Badge tone="amber">Temporary password</Badge> : <Badge tone="green">Active</Badge>}
+                      {!u.active ? <Badge tone="red">Disabled</Badge> : isLocked(u, now) ? <Badge tone="red">Locked until {formatCairoTime(u.lockedUntil!)}</Badge> : u.mustChangePassword ? <Badge tone="amber">Temporary password</Badge> : <Badge tone="green">Active</Badge>}
                     </Td>
                   </tr>
                 ))}
@@ -77,8 +83,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/users">) {
               members={freeMembers.map((m) => ({ id: m.id, label: m.name }))}
               user={preset ? { displayName: preset.name, username: preset.name.toLowerCase(), email: null, roleId: "", memberId: preset.id } : undefined}
             />
-            <Field label="Temporary password" hint="Give it to the person. They must choose their own at the first sign-in">
-              <Input name="password" required minLength={10} defaultValue={generateTemporaryPassword()} className="font-mono" autoComplete="off" />
+            <Field label="Temporary password" hint={`${passwordRuleText(minPasswordLength)} Give it to the person; they choose their own at the first sign-in.`}>
+              <Input name="password" required minLength={minPasswordLength} defaultValue={generateTemporaryPassword(minPasswordLength)} className="font-mono" autoComplete="off" />
             </Field>
             <SubmitButton>Add user</SubmitButton>
           </ActionForm>

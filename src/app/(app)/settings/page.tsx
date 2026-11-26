@@ -3,7 +3,8 @@ import { requirePageAccess } from "@/lib/auth";
 import { RoleProvider } from "@/components/role-provider";
 import { getSettings } from "@/lib/settings";
 import { WEEKDAYS, formatDate, toISODate } from "@/lib/dates";
-import { addHoliday, deleteHoliday, updateSettings } from "@/lib/actions/settings";
+import { addHoliday, deleteHoliday, updateSecuritySettings, updateSettings } from "@/lib/actions/settings";
+import { SECURITY_LIMITS } from "@/lib/sign-in-security";
 import { ActionForm, DeleteButton, SubmitButton } from "@/components/ui/forms";
 import { Card, Empty, Field, Input, PageHeader, Table, Td, Th } from "@/components/ui";
 import { Can } from "@/components/edit-only";
@@ -46,6 +47,23 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               </Field>
             </div>
             <SubmitButton>Save settings</SubmitButton>
+          </ActionForm>
+        </Card>
+
+        <Card title="Sign-in security" className="lg:col-span-2">
+          <ActionForm version={settings.updatedAt.toISOString()} action={updateSecuritySettings} className="space-y-4" resetOnSuccess={false}>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {(Object.keys(SECURITY_LIMITS) as (keyof typeof SECURITY_LIMITS)[]).map((key) => (
+                <Field key={key} label={SECURITY_LIMITS[key].label} hint={`${SECURITY_LIMITS[key].min} to ${SECURITY_LIMITS[key].max}`}>
+                  <Input type="number" name={key} min={SECURITY_LIMITS[key].min} max={SECURITY_LIMITS[key].max} step="1" defaultValue={settings[key]} required />
+                </Field>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500">
+              Passwords need letters and numbers and must differ from the current one; existing passwords change at the next change.
+              Every change here is recorded in the audit log.
+            </p>
+            <SubmitButton>Save sign-in security</SubmitButton>
           </ActionForm>
         </Card>
 
