@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, auditQuery, formatCairo, type AuditAction, type AuditFilters } from "@/lib/audit-entry";
 import { db } from "@/lib/db";
 import { loadAnalytics } from "@/lib/analytics";
 import { loadBacklog, type BacklogFilters } from "@/lib/backlog";
@@ -42,6 +44,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ name: strin
     standup: ["standup.view"],
     backup: ["data.backup"],
     template: ["data.import"],
+    audit: ["audit.view"],
   };
   if (!(needed[name] ?? []).some((p) => me.permissions.has(p))) {
     return NextResponse.json({ error: "Your role does not allow this download." }, { status: 403 });
@@ -155,8 +158,32 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ name: strin
       );
     }
 
-    case "backup":
-      return file(await buildWorkbook(await buildBackupSheets()), "backup");
+    case "backup": {
+      const book = await buildWorkbook(await buildBackupSheets());
+      await recordAudit({ action: "BACKUP_DOWNLOADED", user: me, record: { type: "Backup" } });
+      return file(book, "backup");
+    }
+
+    case "audit": {
+      const aq = auditQuery(q as AuditFilters);
+      const rows = await db.auditLog.findMany({ where: aq.where, orderBy: [{ at: "desc" }, { id: "desc" }], take: 50_000 });
+      const sheet: Sheet = {
+        title: "Audit log",
+        note: `Cairo time, ${aq.from} to ${aq.to}`,
+        columns: [
+          { key: "when", label: "When (Cairo)" }, { key: "user", label: "User" }, { key: "typed", label: "Typed user name" },
+          { key: "action", label: "Action" }, { key: "code", label: "Action code" }, { key: "recordType", label: "Record type" },
+          { key: "recordName", label: "Record" }, { key: "recordId", label: "Record ID" }, { key: "ip", label: "IP address" }, { key: "details", label: "Details" },
+        ],
+        rows: rows.map((r) => ({
+          when: formatCairo(r.at), user: r.userName ?? "", typed: r.typedUsername ?? "", action: AUDIT_ACTIONS[r.action as AuditAction] ?? r.action,
+          code: r.action, recordType: r.recordType ?? "", recordName: r.recordName ?? "", recordId: r.recordId ?? "", ip: r.ip ?? "", details: r.details ?? "",
+        })),
+      };
+      const book = await buildWorkbook([sheet]);
+      await recordAudit({ action: "AUDIT_LOG_EXPORTED", user: me, record: { type: "Audit log" }, details: { from: aq.from, to: aq.to, user: q.user ?? null, action: q.action ?? null, rows: rows.length } });
+      return file(book, "audit-log");
+    }
 
     case "template":
       return file(await buildWorkbook(importTemplateSheets()), "import-template");

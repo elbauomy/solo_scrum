@@ -34,7 +34,7 @@ export default async function SquadPage({ params }: PageProps<"/squads/[id]">) {
       />
       <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
         <Card title="Edit squad">
-          <ActionForm action={updateSquad} className="space-y-3" resetOnSuccess={false}>
+          <ActionForm version={squad.updatedAt.toISOString()} action={updateSquad} className="space-y-3" resetOnSuccess={false}>
             <input type="hidden" name="id" value={squad.id} />
             <SquadFields defaultSprint={settings.defaultSprintLengthDays} values={squad} />
             <div className="flex items-center justify-between">

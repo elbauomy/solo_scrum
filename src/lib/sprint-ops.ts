@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+import { actorId } from "./auth";
+
 export class UserError extends Error {}
 
 /**
@@ -18,8 +20,9 @@ export async function moveItemToSprint(tx: Prisma.TransactionClient, itemId: str
     if (sprint.state === "CLOSED") throw new UserError("A closed sprint cannot receive items.");
   }
   const moves = [item, ...item.children.filter((t) => t.status !== "DONE")].filter((i) => i.sprintId !== sprintId);
+  const by = await actorId();
   for (const m of moves) {
     await tx.workItem.update({ where: { id: m.id }, data: { sprintId } });
-    await tx.workItemHistory.create({ data: { workItemId: m.id, field: "sprint", oldValue: m.sprintId, newValue: sprintId } });
+    await tx.workItemHistory.create({ data: { workItemId: m.id, field: "sprint", oldValue: m.sprintId, newValue: sprintId, changedById: by } });
   }
 }

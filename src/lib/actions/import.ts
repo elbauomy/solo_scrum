@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { readFirstSheet } from "@/lib/excel";
 import { IMPORT_COLUMNS, planImport, type ImportContext } from "@/lib/import";
@@ -13,7 +14,7 @@ const MAX_ROWS = 1000;
 
 /** Check an Excel file (mode "check") or import it (mode "import"). Nothing is imported if any row has an error. */
 export async function importItems(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("data.import");
+  const me = await requirePermission("data.import");
   try {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) return { error: "Please choose an Excel (.xlsx) file." };
@@ -82,9 +83,10 @@ export async function importItems(_prev: ActionState, formData: FormData): Promi
             },
           });
           createdIds.push(created.id);
-          await tx.workItemHistory.create({ data: { workItemId: created.id, field: "created", newValue: p.type } });
-          if (sprintId) await tx.workItemHistory.create({ data: { workItemId: created.id, field: "sprint", newValue: sprintId } });
+          await tx.workItemHistory.create({ data: { workItemId: created.id, field: "created", newValue: p.type, changedById: me.id } });
+          if (sprintId) await tx.workItemHistory.create({ data: { workItemId: created.id, field: "sprint", newValue: sprintId, changedById: me.id } });
         }
+        await recordAudit({ action: "WORK_ITEMS_IMPORTED", user: me, record: { type: "Work items" }, details: { items: plan.items.length, summary } }, tx);
       },
       { timeout: 60000 },
     );

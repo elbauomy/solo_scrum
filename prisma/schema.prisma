@@ -187,14 +187,16 @@ model WorkItem {
 
 /// One row per changed field, used for audit and for reports (cycle time, burndown).
 model WorkItemHistory {
-  id         String   @id @default(cuid())
-  workItemId String
-  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  workItemId  String
+  workItem    WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
   /// created, title, status, priority, assignee, estimate, blocked, parent
-  field      String
-  oldValue   String?
-  newValue   String?
-  changedAt  DateTime @default(now())
+  field       String
+  oldValue    String?
+  newValue    String?
+  changedAt   DateTime @default(now())
+  /// The signed-in user who made the change (empty for rows written before the audit log existed)
+  changedById String?
 
   @@index([workItemId, changedAt])
   @@index([field, changedAt])
@@ -425,4 +427,29 @@ model RolePermission {
   role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permission])
+}
+
+/// Security and administration actions (BR-57). Written by the app only; never edited or deleted.
+model AuditLog {
+  id            String   @id @default(cuid())
+  /// When it happened (stored in UTC, shown in Cairo time)
+  at            DateTime @default(now())
+  /// The signed-in user (empty for a failed sign-in). No foreign key, so entries outlive deleted users.
+  userId        String?
+  /// The user's name at the time
+  userName      String?
+  /// The user name as typed, for a failed sign-in (first 100 characters)
+  typedUsername String?
+  /// Action code, for example SIGN_IN_SUCCESS (see src/lib/audit.ts)
+  action        String
+  recordType    String?
+  recordId      String?
+  recordName    String?
+  /// JSON text: before and after values for changes. Never passwords, hashes, tokens or secrets.
+  details       String?
+  ip            String?
+
+  @@index([at])
+  @@index([userId, at])
+  @@index([action, at])
 }
