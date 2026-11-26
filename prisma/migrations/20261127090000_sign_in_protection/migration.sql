@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE "Setting" ADD COLUMN     "idleMinutes" INTEGER NOT NULL DEFAULT 120,
+ADD COLUMN     "lockMinutes" INTEGER NOT NULL DEFAULT 15,
+ADD COLUMN     "maxFailedSignIns" INTEGER NOT NULL DEFAULT 5,
+ADD COLUMN     "minPasswordLength" INTEGER NOT NULL DEFAULT 8;
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "failedSignIns" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "lockedUntil" TIMESTAMP(3);
+

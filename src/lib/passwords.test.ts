@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { generateTemporaryPassword, hashPassword, passwordProblem, verifyPassword } from "./passwords";
+import { generateTemporaryPassword, hashPassword, verifyPassword } from "./passwords";
+import { passwordProblem } from "./sign-in-security";
 
 describe("passwords", () => {
   it("hashes with a salt and verifies", async () => {
@@ -18,21 +19,14 @@ describe("passwords", () => {
     expect(await verifyPassword("", "scrypt$1$1$1$x$y")).toBe(false);
   });
 
-  it("checks the password rules", () => {
-    expect(passwordProblem("short", "khaled")).toMatch(/at least 10/);
-    expect(passwordProblem("Khaled Elbauomy", "khaled elbauomy")).toMatch(/user name/);
-    expect(passwordProblem("aaaaaaaaaaaa", "x")).toMatch(/repeat/);
-    expect(passwordProblem("a".repeat(201), "x")).toMatch(/at most/);
-    expect(passwordProblem("Sprint-62-ready!", "khaled elbauomy")).toBeNull();
-  });
-
   it("makes temporary passwords that pass the rules", () => {
     const seen = new Set<string>();
     for (let i = 0; i < 50; i++) {
       const p = generateTemporaryPassword();
       expect(p).toMatch(/^[a-zA-Z2-9]{14}$/);
       expect(p).not.toMatch(/[01lIoO]/);
-      expect(passwordProblem(p, "someone")).toBeNull();
+      expect(passwordProblem(p, 8)).toBeNull();
+      expect(passwordProblem(generateTemporaryPassword(20), 20)).toBeNull();
       seen.add(p);
     }
     expect(seen.size).toBe(50);

@@ -170,3 +170,8 @@ export function auditQuery(f: AuditFilters, now: Date = new Date()) {
 export function formatCairo(d: Date): string {
   return new Intl.DateTimeFormat("en-GB", { timeZone: CAIRO, day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
 }
+
+/** "14:05" in Cairo time. */
+export function formatCairoTime(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: CAIRO, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+}

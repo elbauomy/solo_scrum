@@ -16,6 +16,11 @@ model Setting {
   workingDays             Int[]    @default([1, 2, 3, 4, 5])
   defaultDailyHours       Float    @default(8)
   defaultSprintLengthDays Int      @default(14)
+  /// Sign-in security (BR-58)
+  minPasswordLength       Int      @default(8)
+  maxFailedSignIns        Int      @default(5)
+  lockMinutes             Int      @default(15)
+  idleMinutes             Int      @default(120)
   updatedAt               DateTime @updatedAt
 }
 
@@ -399,6 +404,10 @@ model User {
   member             Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
   /// Raised when the password changes or is reset, so every other open session ends
   sessionVersion     Int       @default(1)
+  /// Failed password sign-ins in a row (BR-58)
+  failedSignIns      Int       @default(0)
+  /// While in the future, password sign-in is refused (BR-58)
+  lockedUntil        DateTime?
   lastLoginAt        DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

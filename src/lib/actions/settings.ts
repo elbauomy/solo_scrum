@@ -5,7 +5,8 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { changedFields } from "@/lib/audit-entry";
-import { getSettings } from "@/lib/settings";
+import { getSecuritySettings, getSettings } from "@/lib/settings";
+import { securitySettingsSchema } from "@/lib/sign-in-security";
 import { toISODate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { parseDate } from "@/lib/dates";
@@ -67,4 +68,20 @@ export async function deleteHoliday(_prev: ActionState, formData: FormData): Pro
   }
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Sign-in security (BR-58): password length, lockout and idle timeout. Values outside the allowed ranges are refused. */
+export async function updateSecuritySettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const me = await requirePermission("settings.manage");
+  try {
+    const data = securitySettingsSchema.parse(Object.fromEntries(formData.entries()));
+    const before = await getSecuritySettings();
+    await db.setting.update({ where: { id: 1 }, data });
+    const diff = changedFields(before, data);
+    if (diff) await recordAudit({ action: "SETTINGS_CHANGED", user: me, record: { type: "Settings", name: "Sign-in security" }, details: diff });
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Sign-in security saved." };
 }
