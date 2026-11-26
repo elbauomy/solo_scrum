@@ -64,6 +64,7 @@ Run `npx prisma migrate deploy` on every release; it applies only the ones not y
 | `20261108120000_init_sql_server` | Every table of the product |
 | `20261109090000_users_roles` | Users, roles and role permissions, with filtered unique indexes on the optional user email and member link |
 | `20261126090000_audit_log` | The audit log (BR-57) and "changed by" on work item history. Additive only |
+| `20261127090000_sign_in_protection` | Sign-in security settings (password length, failed sign-ins, lock and idle minutes) and the lock columns on users (BR-58). Additive only; no new environment variables |
 
 ## Moving the current data from Neon (PostgreSQL)
 

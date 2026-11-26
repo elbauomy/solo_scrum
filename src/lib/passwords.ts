@@ -33,21 +33,18 @@ export async function verifyPassword(password: string, stored: string | null | u
   return Boolean(stored) && key.length === expected.length && timingSafeEqual(key, expected);
 }
 
-export const MIN_PASSWORD_LENGTH = 10;
-
-/** Returns a message, or null when the new password is acceptable. */
-export function passwordProblem(password: string, username: string): string | null {
-  if (password.length < MIN_PASSWORD_LENGTH) return `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
-  if (password.length > 200) return "Use at most 200 characters.";
-  if (password.toLowerCase().replace(/\s+/g, "") === username.toLowerCase().replace(/\s+/g, "")) return "The password cannot be your user name.";
-  if (/^(.)\1+$/.test(password)) return "Do not repeat one character.";
-  return null;
-}
-
-/** A temporary password an administrator can hand over: 14 characters, no look-alike letters. */
-export function generateTemporaryPassword(): string {
-  const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < 14; i++) out += alphabet[randomInt(alphabet.length)];
-  return out;
+/**
+ * A temporary password an administrator can hand over: at least 14 characters (more when the minimum is higher),
+ * always with letters and numbers, no look-alike characters.
+ */
+export function generateTemporaryPassword(minLength = 8): string {
+  const letters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const all = letters + digits;
+  const length = Math.max(14, minLength);
+  for (;;) {
+    let out = "";
+    for (let i = 0; i < length; i++) out += all[randomInt(all.length)];
+    if (/[a-zA-Z]/.test(out) && /[0-9]/.test(out)) return out;
+  }
 }

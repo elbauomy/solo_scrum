@@ -1,12 +1,15 @@
 "use client";
 
-import { Fragment, useActionState, useEffect, useRef, type ReactNode } from "react";
+import { Fragment, createContext, useActionState, useContext, useEffect, useRef, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, cn } from "./index";
 import type { ActionState } from "@/lib/action-state";
 import { useReadOnly } from "@/components/role-provider";
 
 type Action = (state: ActionState, formData: FormData) => Promise<ActionState>;
+
+/** Whether the ActionForm around a button is sending. */
+const PendingContext = createContext<boolean | null>(null);
 
 /** A form that runs a Server Action and shows its error or success message. */
 export function ActionForm({
@@ -23,7 +26,7 @@ export function ActionForm({
   className?: string;
   successMessage?: string;
   resetOnSuccess?: boolean;
-  /** Runs after a successful submit (after React has reset the form). */
+  /** Runs after a successful submit (after the form is cleared when resetOnSuccess). */
   onSuccess?: () => void;
   /**
    * For edit forms: a value that changes when the saved record changes (for example its updatedAt).
@@ -32,7 +35,8 @@ export function ActionForm({
    */
   version?: string;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionState(action, {});
+  const [, startTransition] = useTransition();
   const readOnly = useReadOnly();
   const ref = useRef<HTMLFormElement>(null);
   const onSuccessRef = useRef(onSuccess);
@@ -55,8 +59,20 @@ export function ActionForm({
     );
   }
   return (
-    <form ref={ref} action={formAction} className={className}>
-      <Fragment key={version}>{children}</Fragment>
+    // Sent by hand instead of <form action>: React resets a form after every action call, which would wipe what the
+    // user typed when the server answers with an error. Here the form is only cleared after a success (resetOnSuccess).
+    <form
+      ref={ref}
+      className={className}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+        startTransition(() => formAction(data));
+      }}
+    >
+      <PendingContext.Provider value={pending}>
+        <Fragment key={version}>{children}</Fragment>
+      </PendingContext.Provider>
       {state.error && (
         <p role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {state.error}
@@ -72,7 +88,9 @@ export function ActionForm({
 }
 
 export function SubmitButton({ children, variant, className, disabled }: { children: ReactNode; variant?: "primary" | "secondary" | "danger"; className?: string; disabled?: boolean }) {
-  const { pending } = useFormStatus();
+  const status = useFormStatus();
+  const inActionForm = useContext(PendingContext);
+  const pending = inActionForm ?? status.pending;
   const readOnly = useReadOnly();
   if (readOnly) return null;
   return (

@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation";
 import { requirePageAccess } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { deleteUser, resetUserPassword, updateUser } from "@/lib/actions/users";
+import { deleteUser, resetUserPassword, unlockUser, updateUser } from "@/lib/actions/users";
+import { formatCairoTime } from "@/lib/audit-entry";
+import { isLocked } from "@/lib/sign-in-security";
 import { generateTemporaryPassword } from "@/lib/passwords";
+import { getSecuritySettings } from "@/lib/settings";
+import { passwordRuleText } from "@/lib/sign-in-security";
 import { ActionForm, DeleteButton, SubmitButton } from "@/components/ui/forms";
 import { Badge, Card, Field, Input, LinkButton, PageHeader } from "@/components/ui";
 import { UserFields } from "@/components/user-fields";
@@ -10,6 +14,7 @@ import { formatDate } from "@/lib/dates";
 
 export default async function UserPage({ params, searchParams }: PageProps<"/users/[id]">) {
   const me = await requirePageAccess("users.manage");
+  const { minPasswordLength } = await getSecuritySettings();
   const { id } = await params;
   const { created } = (await searchParams) as { created?: string };
   const [user, roles] = await Promise.all([
@@ -23,6 +28,7 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
     select: { id: true, name: true },
   });
   const self = user.id === me.id;
+  const locked = isLocked(user, new Date());
 
   return (
     <>
@@ -37,7 +43,7 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
         </p>
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-        <Card title="Account" actions={!user.active ? <Badge tone="red">Disabled</Badge> : user.mustChangePassword ? <Badge tone="amber">Temporary password</Badge> : <Badge tone="green">Active</Badge>}>
+        <Card title="Account" actions={!user.active ? <Badge tone="red">Disabled</Badge> : locked ? <Badge tone="red">Locked until {formatCairoTime(user.lockedUntil!)}</Badge> : user.mustChangePassword ? <Badge tone="amber">Temporary password</Badge> : <Badge tone="green">Active</Badge>}>
           <ActionForm version={user.updatedAt.toISOString()} action={updateUser} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
             <input type="hidden" name="id" value={user.id} />
             <UserFields
@@ -55,12 +61,23 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
         </Card>
 
         <div className="space-y-6">
+          {locked && (
+            <Card title="Locked">
+              <p className="mb-3 text-sm text-slate-600">
+                Locked until {formatCairoTime(user.lockedUntil!)} (Cairo time) after too many failed sign-ins. Unlock it to let them try again now.
+              </p>
+              <ActionForm action={unlockUser}>
+                <input type="hidden" name="id" value={user.id} />
+                <SubmitButton>Unlock</SubmitButton>
+              </ActionForm>
+            </Card>
+          )}
           <Card title="Reset password">
-            <p className="mb-3 text-sm text-slate-500">Sets a temporary password and signs them out everywhere. They choose their own at the next sign-in.</p>
+            <p className="mb-3 text-sm text-slate-500">Sets a temporary password, unlocks the account and signs them out everywhere. They choose their own at the next sign-in.</p>
             <ActionForm action={resetUserPassword} className="space-y-3">
               <input type="hidden" name="id" value={user.id} />
-              <Field label="Temporary password">
-                <Input name="password" required minLength={10} defaultValue={generateTemporaryPassword()} className="font-mono" autoComplete="off" />
+              <Field label="Temporary password" hint={passwordRuleText(minPasswordLength)}>
+                <Input name="password" required minLength={minPasswordLength} defaultValue={generateTemporaryPassword(minPasswordLength)} className="font-mono" autoComplete="off" />
               </Field>
               <SubmitButton variant="secondary">Reset password</SubmitButton>
             </ActionForm>

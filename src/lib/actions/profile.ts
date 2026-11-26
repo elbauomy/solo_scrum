@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { requireSession, startSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { type ActionState, toActionError } from "@/lib/action-state";
-import { hashPassword, passwordProblem, verifyPassword } from "@/lib/passwords";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
+import { SAME_PASSWORD_MESSAGE, passwordProblem } from "@/lib/sign-in-security";
+import { getSecuritySettings } from "@/lib/settings";
 import { firstAllowedPath } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 
@@ -22,8 +24,8 @@ export async function changePassword(_prev: ActionState, formData: FormData): Pr
       return { error: "Your current password is not right." };
     }
     if (next !== confirm) return { error: "The two new passwords are not the same." };
-    if (user.passwordHash && current === next) return { error: "Choose a password different from the current one." };
-    const problem = passwordProblem(next, user.username);
+    if (user.passwordHash && current === next) return { error: SAME_PASSWORD_MESSAGE };
+    const problem = passwordProblem(next, (await getSecuritySettings()).minPasswordLength);
     if (problem) return { error: problem };
     wasTemporary = user.mustChangePassword;
     const updated = await db.user.update({
