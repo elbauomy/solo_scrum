@@ -39,6 +39,15 @@ export async function buildBackupSheets(): Promise<Sheet[]> {
     db.standupEntry.findMany({ orderBy: { date: "asc" } }),
     db.memberLobAllocation.findMany(),
   ]);
+  const [plans, pauses, users, roles, rolePermissions, audit] = await Promise.all([
+    db.sprintMemberPlan.findMany(),
+    db.sprintPause.findMany({ orderBy: { startDate: "asc" } }),
+    // Never the password hash.
+    db.user.findMany({ orderBy: { username: "asc" }, omit: { passwordHash: true } }),
+    db.role.findMany({ orderBy: { name: "asc" } }),
+    db.rolePermission.findMany(),
+    db.auditLog.findMany({ orderBy: { at: "asc" } }),
+  ]);
   const lobKey = new Map(lobs.map((l) => [l.id, l.key]));
   const itemsWithKey = items.map(({ ...i }) => ({ key: itemKey(lobKey.get(i.lobId) ?? "?", i.number), ...i }));
   const tables: [string, Record<string, unknown>[]][] = [
@@ -46,6 +55,8 @@ export async function buildBackupSheets(): Promise<Sheet[]> {
     ["SquadMemberships", memberships], ["MemberLobAllocations", lobAllocations], ["Leave", leaves], ["WorkItems", itemsWithKey], ["WorkItemHistory", history],
     ["Sprints", sprints], ["SprintShares", shares], ["SprintCommitments", commitments], ["Releases", releases],
     ["ReleaseDateChanges", changes], ["TaskBaselines", baselines], ["Standups", standups],
+    ["SprintMemberPlans", plans], ["SprintPauses", pauses], ["Users", users], ["Roles", roles], ["RolePermissions", rolePermissions],
+    ["AuditLog", audit],
   ];
   return tables.map(([title, records]) => ({ title, ...flatten(records) }));
 }

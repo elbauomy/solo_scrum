@@ -28,7 +28,7 @@ export default async function RolePage({ params, searchParams }: PageProps<"/rol
       {saved && <p role="status" className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Role created.</p>}
       <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
         <Card title="Role">
-          <RoleForm action={updateRole} role={{ id: role.id, name: role.name, description: role.description, builtIn: role.builtIn, permissions }} submitLabel="Save role" />
+          <RoleForm version={role.updatedAt.toISOString()} action={updateRole} role={{ id: role.id, name: role.name, description: role.description, builtIn: role.builtIn, permissions }} submitLabel="Save role" />
         </Card>
         <div className="space-y-6">
           <Card title={`Users with this role (${role.users.length})`}>

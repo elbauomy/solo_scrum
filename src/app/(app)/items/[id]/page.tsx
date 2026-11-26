@@ -57,6 +57,8 @@ export default async function ItemPage({ params }: PageProps<"/items/[id]">) {
     db.sprint.findMany({ where: { lobId: item.lobId, OR: [{ state: { not: "CLOSED" } }, { id: item.sprintId ?? "" }] }, orderBy: { startDate: "asc" }, select: { id: true, name: true, state: true } }),
   ]);
 
+  const editorIds = [...new Set(item.history.map((h) => h.changedById).filter((v): v is string => Boolean(v)))];
+  const editors = new Map((await db.user.findMany({ where: { id: { in: editorIds } }, select: { id: true, displayName: true } })).map((u) => [u.id, u.displayName]));
   const key = itemKey(item.lob.key, item.number);
   const memberName = new Map(allMembers.map((m) => [m.id, m.name]));
   const itemLabel = new Map(lobItems.map((i) => [i.id, `${itemKey(item.lob.key, i.number)} ${i.title}`]));
@@ -137,7 +139,7 @@ export default async function ItemPage({ params }: PageProps<"/items/[id]">) {
       <div className="grid gap-6 xl:grid-cols-[1fr_24rem]">
         <div className="space-y-6">
           <Card title="Details">
-            <ActionForm action={updateWorkItem} className="space-y-4" successMessage="Saved." resetOnSuccess={false}>
+            <ActionForm version={item.updatedAt.toISOString()} action={updateWorkItem} className="space-y-4" successMessage="Saved." resetOnSuccess={false}>
               <input type="hidden" name="id" value={item.id} />
               <Field label="Title">
                 <Input name="title" required maxLength={200} defaultValue={item.title} />
@@ -271,7 +273,10 @@ export default async function ItemPage({ params }: PageProps<"/items/[id]">) {
               <ol className="space-y-2 text-sm">
                 {item.history.map((h) => (
                   <li key={h.id} className="border-l-2 border-orange-200 pl-3">
-                    <div className="text-xs text-slate-500">{h.changedAt.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</div>
+                    <div className="text-xs text-slate-500">
+                      {h.changedAt.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Cairo" })}
+                      {h.changedById && editors.get(h.changedById) ? ` · ${editors.get(h.changedById)}` : ""}
+                    </div>
                     {h.field === "created" ? (
                       <div>Created as {describe("created", h.newValue)}</div>
                     ) : (

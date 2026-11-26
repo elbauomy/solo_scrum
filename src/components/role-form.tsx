@@ -6,9 +6,9 @@ import type { ActionState } from "@/lib/action-state";
 
 type Role = { id: string; name: string; description: string; builtIn: boolean; permissions: string[] };
 
-export function RoleForm({ action, role, submitLabel }: { action: (s: ActionState, f: FormData) => Promise<ActionState>; role?: Role; submitLabel: string }) {
+export function RoleForm({ action, role, submitLabel, version }: { action: (s: ActionState, f: FormData) => Promise<ActionState>; role?: Role; submitLabel: string; version?: string }) {
   return (
-    <ActionForm action={action} className="space-y-5" resetOnSuccess={false}>
+    <ActionForm action={action} className="space-y-5" resetOnSuccess={false} version={version}>
       {role && <input type="hidden" name="id" value={role.id} />}
       <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
         <Field label="Name">

@@ -25,7 +25,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Working calendar">
-          <ActionForm action={updateSettings} className="space-y-4" successMessage="Settings saved." resetOnSuccess={false}>
+          <ActionForm version={settings.updatedAt.toISOString()} action={updateSettings} className="space-y-4" successMessage="Settings saved." resetOnSuccess={false}>
             <div>
               <span className="text-sm font-medium text-slate-700">Working days</span>
               <div className="mt-2 flex flex-wrap gap-2">

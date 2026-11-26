@@ -279,7 +279,7 @@ export default async function SprintPage({ params, searchParams }: PageProps<"/s
           <Can perm="sprints.manage">
           <div id="edit" className="scroll-mt-4">
             <Card title="Edit sprint">
-              <ActionForm action={updateSprint} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
+              <ActionForm version={[s.name, s.goal, toISODate(s.start), toISODate(s.end), s.releaseId ?? ""].join("|")} action={updateSprint} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
                 <input type="hidden" name="id" value={s.id} />
                 <Field label="Name"><Input name="name" required maxLength={100} defaultValue={s.name} /></Field>
                 <div className="grid grid-cols-2 gap-3">

@@ -38,7 +38,7 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <Card title="Account" actions={!user.active ? <Badge tone="red">Disabled</Badge> : user.mustChangePassword ? <Badge tone="amber">Temporary password</Badge> : <Badge tone="green">Active</Badge>}>
-          <ActionForm action={updateUser} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
+          <ActionForm version={user.updatedAt.toISOString()} action={updateUser} className="space-y-3" successMessage="Saved." resetOnSuccess={false}>
             <input type="hidden" name="id" value={user.id} />
             <UserFields
               roles={roles.map((r) => ({ id: r.id, label: r.name }))}

@@ -80,14 +80,18 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     key: "roles", label: "Roles", path: "/roles",
     permissions: [{ key: "roles.manage", label: "Manage roles and permissions" }],
   },
+  {
+    key: "audit", label: "Audit log", path: "/audit",
+    permissions: [{ key: "audit.view", label: "View and export", hint: "Sign-ins, user and role changes, settings, backups, imports" }],
+  },
 ];
 
 export const ALL_PERMISSIONS: string[] = PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key));
 const KNOWN = new Set(ALL_PERMISSIONS);
 
-/** The starting "Viewer" role: every page, nothing changed. Downloads of reports and the backup included, as before. */
+/** The starting "Viewer" role: every page except the audit log, nothing changed. Downloads of reports and the backup included, as before. */
 export const VIEWER_PERMISSIONS: string[] = [
-  ...ALL_PERMISSIONS.filter((k) => k.endsWith(".view")),
+  ...ALL_PERMISSIONS.filter((k) => k.endsWith(".view") && k !== "audit.view"),
   "reports.export",
   "data.backup",
 ];
@@ -124,6 +128,7 @@ export const PAGE_ACCESS: { path: string; anyOf: string[] }[] = [
   { path: "/data", anyOf: ["data.import", "data.backup"] },
   { path: "/users", anyOf: ["users.manage"] },
   { path: "/roles", anyOf: ["roles.manage"] },
+  { path: "/audit", anyOf: ["audit.view"] },
 ];
 
 export function hasAny(granted: ReadonlySet<string>, anyOf: string[]): boolean {

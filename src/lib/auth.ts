@@ -86,6 +86,15 @@ export async function requirePageAccess(...anyOf: string[]): Promise<CurrentUser
   return user;
 }
 
+/** The signed-in user's ID, for "who made this change" columns (null outside a signed-in request). */
+export async function actorId(): Promise<string | null> {
+  try {
+    return (await getCurrentUser())?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** True when the signed-in user has the permission. For server pages that show or hide a part. */
 export async function can(permission: string): Promise<boolean> {
   return (await getCurrentUser())?.permissions.has(permission) ?? false;

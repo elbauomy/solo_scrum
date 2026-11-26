@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useActionState, useEffect, useRef, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, cn } from "./index";
 import type { ActionState } from "@/lib/action-state";
@@ -16,6 +16,7 @@ export function ActionForm({
   successMessage,
   resetOnSuccess = true,
   onSuccess,
+  version,
 }: {
   action: Action;
   children: ReactNode;
@@ -24,6 +25,12 @@ export function ActionForm({
   resetOnSuccess?: boolean;
   /** Runs after a successful submit (after React has reset the form). */
   onSuccess?: () => void;
+  /**
+   * For edit forms: a value that changes when the saved record changes (for example its updatedAt).
+   * The fields are rebuilt from the new saved values, so a second save never sends stale defaults,
+   * while the form keeps its "Saved." message.
+   */
+  version?: string;
 }) {
   const [state, formAction] = useActionState(action, {});
   const readOnly = useReadOnly();
@@ -43,13 +50,13 @@ export function ActionForm({
   if (readOnly) {
     return (
       <form className={className} onSubmit={(e) => e.preventDefault()}>
-        <fieldset disabled className="contents">{children}</fieldset>
+        <fieldset disabled className="contents"><Fragment key={version}>{children}</Fragment></fieldset>
       </form>
     );
   }
   return (
     <form ref={ref} action={formAction} className={className}>
-      {children}
+      <Fragment key={version}>{children}</Fragment>
       {state.error && (
         <p role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {state.error}

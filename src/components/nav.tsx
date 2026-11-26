@@ -23,6 +23,7 @@ const ICONS = {
   settings: (<><path d="M4 8h9M17 8h3M4 16h3M11 16h9" /><circle cx="15" cy="8" r="2" /><circle cx="9" cy="16" r="2" /></>),
   data: (<><path d="M12 4v10m0 0l-3.5-3.5M12 14l3.5-3.5" /><path d="M4.5 15.5v2A2.5 2.5 0 007 20h10a2.5 2.5 0 002.5-2.5v-2" /></>),
   users: (<><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19c.5-3 2.7-4.8 5.5-4.8 1.3 0 2.5.4 3.4 1.1" /><circle cx="17.5" cy="16.5" r="3" /><path d="M17.5 15v1.5l1 .8" /></>),
+  audit: (<><path d="M7 3.5h7.5L19 8v11a1.5 1.5 0 01-1.5 1.5h-10A1.5 1.5 0 016 19V5a1.5 1.5 0 011-1.5z" /><path d="M14 3.5V8h5M9.5 12.5h6M9.5 16h4" /></>),
   roles: (<><path d="M12 3.5l7 3v5c0 4.2-3 7.6-7 9-4-1.4-7-4.8-7-9v-5l7-3z" /><path d="M9 12l2 2 4-4" /></>),
 } satisfies Record<string, ReactNode>;
 
@@ -60,6 +61,7 @@ const sections: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/users", label: "Users", icon: "users" },
       { href: "/roles", label: "Roles & Permissions", icon: "roles" },
+      { href: "/audit", label: "Audit log", icon: "audit" },
     ],
   },
 ];

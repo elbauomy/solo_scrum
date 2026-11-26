@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requirePermission } from "@/lib/auth";
+import { actorId, requirePermission } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { addDays, parseDate, toISODate, todayUTC } from "@/lib/dates";
 import { addWorkingDays, workingDaysBetween } from "@/lib/capacity";
@@ -163,7 +164,7 @@ export async function deleteSprint(_prev: ActionState, formData: FormData): Prom
  * Items in a deleted sprint go back to the backlog.
  */
 export async function deleteSprints(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requirePermission("sprints.manage");
+  const me = await requirePermission("sprints.manage");
   try {
     const ids = formData.getAll("id").map(String).filter(Boolean);
     if (ids.length === 0) return { error: "Tick at least one sprint first." };
@@ -175,6 +176,14 @@ export async function deleteSprints(_prev: ActionState, formData: FormData): Pro
         const items = await tx.workItem.findMany({ where: { sprintId: sp.id, type: { in: ["STORY", "BUG"] } }, select: { id: true } });
         for (const i of items) await moveItemToSprint(tx, i.id, null);
         await tx.sprint.delete({ where: { id: sp.id } });
+      }
+      if (deletable.length > 0) {
+        await recordAudit({
+          action: "BULK_DELETE",
+          user: me,
+          record: { type: "Sprints" },
+          details: { recordType: "Sprint", count: deletable.length, sprints: deletable.map((sp) => `${sp.lob.key} ${sp.name}`) },
+        }, tx);
       }
     });
     refresh();
@@ -303,7 +312,7 @@ export async function quickAssign(taskId: string, memberId: string | null): Prom
       }
       if (task.assigneeId === memberId) return;
       await tx.workItem.update({ where: { id: taskId }, data: { assigneeId: memberId } });
-      await tx.workItemHistory.create({ data: { workItemId: taskId, field: "assignee", oldValue: task.assigneeId, newValue: memberId } });
+      await tx.workItemHistory.create({ data: { workItemId: taskId, field: "assignee", oldValue: task.assigneeId, newValue: memberId, changedById: await actorId() } });
     });
   } catch (err) {
     return fail(err);
@@ -322,7 +331,7 @@ export async function quickEstimate(taskId: string, hours: number | null): Promi
     if (task.estimateHours === h) return { ok: true };
     await db.$transaction([
       db.workItem.update({ where: { id: taskId }, data: { estimateHours: h } }),
-      db.workItemHistory.create({ data: { workItemId: taskId, field: "estimate", oldValue: task.estimateHours == null ? null : String(task.estimateHours), newValue: h == null ? null : String(h) } }),
+      db.workItemHistory.create({ data: { workItemId: taskId, field: "estimate", oldValue: task.estimateHours == null ? null : String(task.estimateHours), newValue: h == null ? null : String(h), changedById: await actorId() } }),
     ]);
   } catch (err) {
     return fail(err);
